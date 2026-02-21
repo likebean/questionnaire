@@ -22,7 +22,7 @@ public class Result<T> {
         return ok(null);
     }
 
-    protected static <T> Result<T> fail(int code, String message) {
+    public static <T> Result<T> fail(int code, String message) {
         return new Result<>(code, message, null);
     }
 }

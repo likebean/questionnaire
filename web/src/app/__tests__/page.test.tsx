@@ -1,39 +1,13 @@
 import { render, screen } from '@testing-library/react'
 import Home from '../page'
 
-jest.mock('@/services/api', () => ({
-  healthApi: {
-    getHealth: jest.fn(),
-  },
-}))
-
-const healthApi = require('@/services/api').healthApi
-
 describe('Home', () => {
-  it('shows loading initially then health data when API succeeds', async () => {
-    ;(healthApi.getHealth as jest.Mock).mockResolvedValue({
-      code: 200,
-      message: 'success',
-      data: {
-        status: 'UP',
-        service: 'questionnaire-api',
-        timestamp: '2025-01-01T00:00:00Z',
-      },
-    })
-
+  it('shows welcome and link to my surveys', () => {
     render(<Home />)
-    expect(screen.getByText(/加载中/)).toBeInTheDocument()
-
-    const status = await screen.findByText('UP', {}, { timeout: 3000 })
-    expect(status).toBeInTheDocument()
-    expect(screen.getByText('questionnaire-api')).toBeInTheDocument()
-  })
-
-  it('shows error when API fails', async () => {
-    ;(healthApi.getHealth as jest.Mock).mockRejectedValue(new Error('Network Error'))
-
-    render(<Home />)
-    await screen.findByText('服务异常', {}, { timeout: 3000 })
-    expect(screen.getByText('Network Error')).toBeInTheDocument()
+    expect(screen.getByText('欢迎使用问卷系统')).toBeInTheDocument()
+    expect(screen.getByText(/高校问卷管理与填写/)).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: '我的问卷' })
+    expect(link).toBeInTheDocument()
+    expect(link).toHaveAttribute('href', '/surveys')
   })
 })
