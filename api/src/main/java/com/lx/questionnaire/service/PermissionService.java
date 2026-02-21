@@ -13,4 +13,6 @@ public interface PermissionService {
 
     /** 全部权限列表（用于角色分配权限时下拉/多选） */
     List<Permission> listAll();
+
+    void update(Long id, Permission permission);
 }

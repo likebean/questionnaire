@@ -109,6 +109,11 @@ export const usersApi = {
     apiClient.put(`/users/${userId}/roles`, roleIds) as Promise<ApiResponse<null>>,
 }
 
+export interface UpdateAccountRequest {
+  loginId?: string
+  password?: string
+}
+
 export const accountsApi = {
   query: (params?: { keyword?: string; page?: number; pageSize?: number }) =>
     apiClient.get('/accounts/query', { params }) as Promise<ApiResponse<PaginatedResponse<AccountVO>>>,
@@ -118,6 +123,8 @@ export const accountsApi = {
     apiClient.get(`/accounts/user/${userId}`) as Promise<ApiResponse<AccountVO[]>>,
   create: (data: CreateAccountRequest) =>
     apiClient.post('/accounts', data) as Promise<ApiResponse<null>>,
+  update: (id: number, data: UpdateAccountRequest) =>
+    apiClient.put(`/accounts/${id}`, data) as Promise<ApiResponse<null>>,
   delete: (id: number) =>
     apiClient.delete(`/accounts/${id}`) as Promise<ApiResponse<null>>,
 }
@@ -167,4 +174,32 @@ export const permissionsApi = {
     apiClient.get('/permissions/all') as Promise<ApiResponse<PermissionVO[]>>,
   getById: (id: number) =>
     apiClient.get(`/permissions/${id}`) as Promise<ApiResponse<PermissionVO>>,
+  update: (id: number, data: { name?: string; description?: string | null }) =>
+    apiClient.put(`/permissions/${id}`, data) as Promise<ApiResponse<null>>,
+}
+
+export interface DepartmentVO {
+  id: number
+  code: string
+  name: string
+  parentId: number | null
+  level: number | null
+  sort: number | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export const departmentsApi = {
+  query: (params?: { keyword?: string; page?: number; pageSize?: number }) =>
+    apiClient.get('/departments/query', { params }) as Promise<ApiResponse<PaginatedResponse<DepartmentVO>>>,
+  getAll: () =>
+    apiClient.get('/departments/all') as Promise<ApiResponse<DepartmentVO[]>>,
+  getById: (id: number) =>
+    apiClient.get(`/departments/${id}`) as Promise<ApiResponse<DepartmentVO>>,
+  create: (data: { code: string; name: string; parentId?: number | null; sort?: number | null }) =>
+    apiClient.post('/departments', data) as Promise<ApiResponse<DepartmentVO | null>>,
+  update: (id: number, data: { code?: string; name?: string; parentId?: number | null; sort?: number | null }) =>
+    apiClient.put(`/departments/${id}`, data) as Promise<ApiResponse<null>>,
+  delete: (id: number) =>
+    apiClient.delete(`/departments/${id}`) as Promise<ApiResponse<null>>,
 }

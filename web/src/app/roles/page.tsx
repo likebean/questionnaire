@@ -25,7 +25,7 @@ export default function RolesPage() {
           setLoadError(res.message || '加载失败')
           return
         }
-        const raw = res.data as Record<string, unknown> | null | undefined
+        const raw = res.data as unknown as Record<string, unknown> | null | undefined
         if (!raw) {
           setData(null)
           return

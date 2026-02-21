@@ -3,6 +3,7 @@ package com.lx.questionnaire.service;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.lx.questionnaire.entity.Account;
 import com.lx.questionnaire.vo.CreateAccountVO;
+import com.lx.questionnaire.vo.UpdateAccountVO;
 
 import java.util.List;
 
@@ -19,6 +20,8 @@ public interface AccountService {
     Account getById(Long id);
 
     void createAccount(CreateAccountVO vo);
+
+    void updateAccount(Long id, UpdateAccountVO vo);
 
     void deleteAccount(Long id);
 

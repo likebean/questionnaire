@@ -2,27 +2,40 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usersApi, type UserVO, type PaginatedResponse } from '@/services/api'
+import { usersApi, departmentsApi, type UserVO, type DepartmentVO, type PaginatedResponse } from '@/services/api'
 
 export default function UsersPage() {
   const [data, setData] = useState<PaginatedResponse<UserVO> | null>(null)
   const [loading, setLoading] = useState(true)
   const [keyword, setKeyword] = useState('')
+  const [departmentId, setDepartmentId] = useState<number | ''>('')
+  const [departments, setDepartments] = useState<DepartmentVO[]>([])
   const [page, setPage] = useState(1)
   const [deleteTarget, setDeleteTarget] = useState<UserVO | null>(null)
   const [deleting, setDeleting] = useState(false)
   const pageSize = 20
 
   useEffect(() => {
+    departmentsApi.getAll().then((res) => {
+      if (res.code === 200 && res.data) setDepartments(res.data)
+    })
+  }, [])
+
+  useEffect(() => {
     setLoading(true)
     usersApi
-      .query({ keyword: keyword || undefined, page, pageSize })
+      .query({
+        keyword: keyword || undefined,
+        departmentId: departmentId === '' ? undefined : departmentId,
+        page,
+        pageSize,
+      })
       .then((res) => {
         if (res.code === 200 && res.data) setData(res.data)
       })
       .catch(() => setData(null))
       .finally(() => setLoading(false))
-  }, [keyword, page])
+  }, [keyword, departmentId, page])
 
   const handleDeleteClick = (u: UserVO) => setDeleteTarget(u)
 
@@ -66,8 +79,8 @@ export default function UsersPage() {
       </div>
 
       <div className="mb-6 bg-white rounded-lg shadow-card p-4">
-        <div className="flex flex-wrap items-center justify-between">
-          <div className="w-full md:w-auto mt-4 md:mt-0">
+        <div className="flex flex-wrap items-center gap-4">
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">搜索用户</label>
             <div className="relative rounded-md shadow-sm">
               <input
@@ -81,6 +94,21 @@ export default function UsersPage() {
                 <i className="fas fa-search text-gray-400" />
               </div>
             </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">所属院系</label>
+            <select
+              className="focus:ring-blue-500 focus:border-blue-500 block w-full sm:w-48 py-2 border border-gray-300 rounded-md bg-white text-gray-900 shadow-sm text-sm"
+              value={departmentId}
+              onChange={(e) => setDepartmentId(e.target.value === '' ? '' : Number(e.target.value))}
+            >
+              <option value="">全部</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </div>
@@ -102,6 +130,9 @@ export default function UsersPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
                   手机
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                  院系
+                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
                   操作
                 </th>
@@ -110,13 +141,13 @@ export default function UsersPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-8 text-gray-400">
+                  <td colSpan={6} className="text-center py-8 text-gray-400">
                     加载中...
                   </td>
                 </tr>
               ) : !data || data.items.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-8 text-gray-400">
+                  <td colSpan={6} className="text-center py-8 text-gray-400">
                     暂无数据
                   </td>
                 </tr>
@@ -132,6 +163,9 @@ export default function UsersPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {u.phone ?? '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {u.departmentId != null ? departments.find((d) => d.id === u.departmentId)?.name ?? u.departmentId : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <div className="flex justify-end space-x-2">

@@ -195,6 +195,13 @@ export default function AccountsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <div className="flex justify-end space-x-2">
+                        <Link
+                          href={`/accounts/${a.id}`}
+                          className="text-gray-600 hover:text-gray-900"
+                          title="编辑"
+                        >
+                          <i className="fas fa-edit" />
+                        </Link>
                         <button
                           type="button"
                           className="text-gray-500 hover:text-red-600"

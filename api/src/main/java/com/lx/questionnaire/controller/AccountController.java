@@ -11,6 +11,7 @@ import com.lx.questionnaire.service.AccountService;
 import com.lx.questionnaire.service.UserService;
 import com.lx.questionnaire.util.SecurityUtils;
 import com.lx.questionnaire.vo.CreateAccountVO;
+import com.lx.questionnaire.vo.UpdateAccountVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -67,6 +68,13 @@ public class AccountController {
     public Result<Void> createAccount(@Valid @RequestBody CreateAccountVO vo) {
         requireSchoolAdmin();
         accountService.createAccount(vo);
+        return Result.ok();
+    }
+
+    @PutMapping("/{id}")
+    public Result<Void> updateAccount(@PathVariable Long id, @RequestBody UpdateAccountVO vo) {
+        requireSchoolAdmin();
+        accountService.updateAccount(id, vo);
         return Result.ok();
     }
 

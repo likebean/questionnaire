@@ -5,8 +5,8 @@ import com.lx.questionnaire.common.BusinessException;
 import com.lx.questionnaire.common.ErrorCode;
 import com.lx.questionnaire.common.PaginatedResponse;
 import com.lx.questionnaire.common.Result;
-import com.lx.questionnaire.entity.Permission;
-import com.lx.questionnaire.service.PermissionService;
+import com.lx.questionnaire.entity.Department;
+import com.lx.questionnaire.service.DepartmentService;
 import com.lx.questionnaire.service.UserService;
 import com.lx.questionnaire.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
@@ -15,16 +15,16 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * 权限管理（校管）：列表、详情、全部列表（供角色分配时使用）。
+ * 院系管理（校管）：列表、全部、详情、新增、编辑、删除。
  */
 @RestController
-@RequestMapping("/api/permissions")
+@RequestMapping("/api/departments")
 @RequiredArgsConstructor
-public class PermissionController {
+public class DepartmentController {
 
     private static final String ROLE_SCHOOL_ADMIN = "SCHOOL_ADMIN";
 
-    private final PermissionService permissionService;
+    private final DepartmentService departmentService;
     private final UserService userService;
 
     private void requireSchoolAdmin() {
@@ -37,32 +37,44 @@ public class PermissionController {
     }
 
     @GetMapping("/query")
-    public Result<PaginatedResponse<Permission>> queryPermissions(
+    public Result<PaginatedResponse<Department>> query(
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String resourceType,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int pageSize) {
         requireSchoolAdmin();
-        Page<Permission> pageResult = permissionService.queryPermissions(keyword, resourceType, page, pageSize);
+        Page<Department> pageResult = departmentService.queryDepartments(keyword, page, pageSize);
         return Result.ok(PaginatedResponse.from(pageResult));
     }
 
     @GetMapping("/all")
-    public Result<List<Permission>> listAll() {
+    public Result<List<Department>> listAll() {
         requireSchoolAdmin();
-        return Result.ok(permissionService.listAll());
+        return Result.ok(departmentService.listAll());
     }
 
     @GetMapping("/{id}")
-    public Result<Permission> getById(@PathVariable Long id) {
+    public Result<Department> getById(@PathVariable Long id) {
         requireSchoolAdmin();
-        return Result.ok(permissionService.getById(id));
+        return Result.ok(departmentService.getById(id));
+    }
+
+    @PostMapping
+    public Result<Department> create(@RequestBody Department department) {
+        requireSchoolAdmin();
+        return Result.ok(departmentService.create(department));
     }
 
     @PutMapping("/{id}")
-    public Result<Void> update(@PathVariable Long id, @RequestBody Permission permission) {
+    public Result<Void> update(@PathVariable Long id, @RequestBody Department department) {
         requireSchoolAdmin();
-        permissionService.update(id, permission);
+        departmentService.update(id, department);
+        return Result.ok();
+    }
+
+    @DeleteMapping("/{id}")
+    public Result<Void> delete(@PathVariable Long id) {
+        requireSchoolAdmin();
+        departmentService.delete(id);
         return Result.ok();
     }
 }

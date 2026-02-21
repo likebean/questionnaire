@@ -52,4 +52,17 @@ public class PermissionServiceImpl implements PermissionService {
                         .orderByAsc(Permission::getAction)
                         .orderByAsc(Permission::getDataScope));
     }
+
+    @Override
+    public void update(Long id, Permission permission) {
+        Permission existing = getById(id);
+        if (StringUtils.hasText(permission.getName())) {
+            existing.setName(permission.getName().trim());
+        }
+        if (permission.getDescription() != null) {
+            String desc = permission.getDescription().trim();
+            existing.setDescription(desc.isEmpty() ? null : desc);
+        }
+        permissionMapper.updateById(existing);
+    }
 }

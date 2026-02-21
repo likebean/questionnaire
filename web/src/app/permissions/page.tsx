@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { permissionsApi, type PermissionVO, type PaginatedResponse } from '@/services/api'
 
 export default function PermissionsPage() {
@@ -79,18 +80,21 @@ export default function PermissionsPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
                   描述
                 </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                  操作
+                </th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-8 text-gray-400">
+                  <td colSpan={6} className="text-center py-8 text-gray-400">
                     加载中...
                   </td>
                 </tr>
               ) : !data || data.items.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-8 text-gray-400">
+                  <td colSpan={6} className="text-center py-8 text-gray-400">
                     暂无数据
                   </td>
                 </tr>
@@ -108,6 +112,15 @@ export default function PermissionsPage() {
                       {p.dataScope ?? '-'}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">{p.description ?? '-'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <Link
+                        href={`/permissions/${p.id}`}
+                        className="text-gray-600 hover:text-gray-900"
+                        title="编辑"
+                      >
+                        <i className="fas fa-edit" />
+                      </Link>
+                    </td>
                   </tr>
                 ))
               )}

@@ -9,6 +9,7 @@ import com.lx.questionnaire.mapper.AccountMapper;
 import com.lx.questionnaire.service.AccountService;
 import com.lx.questionnaire.service.UserService;
 import com.lx.questionnaire.vo.CreateAccountVO;
+import com.lx.questionnaire.vo.UpdateAccountVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -80,6 +81,22 @@ public class AccountServiceImpl implements AccountService {
             account.setPasswordHash(null);
         }
         accountMapper.insert(account);
+    }
+
+    @Override
+    public void updateAccount(Long id, UpdateAccountVO vo) {
+        Account account = getById(id);
+        if (StringUtils.hasText(vo.getLoginId())) {
+            Account existing = getByLoginIdAndAuthSource(vo.getLoginId(), account.getAuthSource());
+            if (existing != null && !existing.getId().equals(id)) {
+                throw new BusinessException(new ErrorCode(2005, "该登录标识已存在") {});
+            }
+            account.setLoginId(vo.getLoginId().trim());
+        }
+        if ("local".equalsIgnoreCase(account.getAuthSource()) && StringUtils.hasText(vo.getPassword())) {
+            account.setPasswordHash(passwordEncoder.encode(vo.getPassword()));
+        }
+        accountMapper.updateById(account);
     }
 
     @Override

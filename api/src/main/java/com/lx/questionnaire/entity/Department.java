@@ -20,3 +20,4 @@ public class Department {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
+

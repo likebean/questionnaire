@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
-import { usersApi, rolesApi, type UserVO, type RoleVO } from '@/services/api'
+import { usersApi, rolesApi, departmentsApi, type UserVO, type RoleVO, type DepartmentVO } from '@/services/api'
 
 const inputClass =
   'block w-full rounded-md border border-gray-300 bg-white text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-2 pl-3'
@@ -17,6 +17,8 @@ export default function EditUserPage() {
   const [nickname, setNickname] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
+  const [departmentId, setDepartmentId] = useState<number | ''>('')
+  const [departments, setDepartments] = useState<DepartmentVO[]>([])
   const [allRoles, setAllRoles] = useState<RoleVO[]>([])
   const [selectedRoleIds, setSelectedRoleIds] = useState<Set<number>>(new Set())
   const [submitting, setSubmitting] = useState(false)
@@ -30,7 +32,11 @@ export default function EditUserPage() {
         setNickname(res.data.nickname ?? '')
         setEmail(res.data.email ?? '')
         setPhone(res.data.phone ?? '')
+        setDepartmentId(res.data.departmentId ?? '')
       }
+    })
+    departmentsApi.getAll().then((res) => {
+      if (res.code === 200 && res.data) setDepartments(res.data)
     })
     usersApi.getRoleIds(id).then((res) => {
       if (res.code === 200 && res.data) setSelectedRoleIds(new Set(res.data))
@@ -98,6 +104,21 @@ export default function EditUserPage() {
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="请输入手机号"
               />
+            </div>
+            <div>
+              <label className={labelClass}>所属院系</label>
+              <select
+                className={inputClass}
+                value={departmentId}
+                onChange={(e) => setDepartmentId(e.target.value === '' ? '' : Number(e.target.value))}
+              >
+                <option value="">无</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}（{d.code}）
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
           {error && <p className="text-sm text-red-500 mb-4">{error}</p>}
