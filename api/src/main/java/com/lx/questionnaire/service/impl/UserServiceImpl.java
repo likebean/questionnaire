@@ -15,6 +15,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
 
 @Service
@@ -32,15 +34,34 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public List<String> getRoleCodesByUserId(String userId) {
-        LambdaQueryWrapper<UserRole> q = new LambdaQueryWrapper<>();
-        q.eq(UserRole::getUserId, userId);
-        List<UserRole> list = userRoleMapper.selectList(q);
-        if (list.isEmpty()) {
-            return List.of();
-        }
-        List<Long> roleIds = list.stream().map(UserRole::getRoleId).toList();
+        List<Long> roleIds = getRoleIdsByUserId(userId);
+        if (roleIds.isEmpty()) return List.of();
         List<Role> roles = roleMapper.selectBatchIds(roleIds);
         return roles.stream().map(Role::getCode).toList();
+    }
+
+    @Override
+    public List<Long> getRoleIdsByUserId(String userId) {
+        List<UserRole> list = userRoleMapper.selectList(
+                new LambdaQueryWrapper<UserRole>().eq(UserRole::getUserId, userId));
+        return list.stream().map(UserRole::getRoleId).toList();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void setUserRoles(String userId, List<Long> roleIds) {
+        if (userMapper.selectById(userId) == null) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
+        userRoleMapper.delete(new LambdaQueryWrapper<UserRole>().eq(UserRole::getUserId, userId));
+        if (roleIds != null && !roleIds.isEmpty()) {
+            for (Long roleId : roleIds) {
+                UserRole ur = new UserRole();
+                ur.setUserId(userId);
+                ur.setRoleId(roleId);
+                userRoleMapper.insert(ur);
+            }
+        }
     }
 
     @Override
@@ -74,11 +95,13 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void deleteUser(String id) {
         User existing = userMapper.selectById(id);
         if (existing == null) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
+        userRoleMapper.delete(new LambdaQueryWrapper<UserRole>().eq(UserRole::getUserId, id));
         userMapper.deleteById(id);
     }
 }

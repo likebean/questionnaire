@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
-import { usersApi, type UserVO } from '@/services/api'
+import { usersApi, rolesApi, type UserVO, type RoleVO } from '@/services/api'
 
 const inputClass =
   'block w-full rounded-md border border-gray-300 bg-white text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-2 pl-3'
@@ -17,7 +17,10 @@ export default function EditUserPage() {
   const [nickname, setNickname] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
+  const [allRoles, setAllRoles] = useState<RoleVO[]>([])
+  const [selectedRoleIds, setSelectedRoleIds] = useState<Set<number>>(new Set())
   const [submitting, setSubmitting] = useState(false)
+  const [rolesSubmitting, setRolesSubmitting] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -28,6 +31,12 @@ export default function EditUserPage() {
         setEmail(res.data.email ?? '')
         setPhone(res.data.phone ?? '')
       }
+    })
+    usersApi.getRoleIds(id).then((res) => {
+      if (res.code === 200 && res.data) setSelectedRoleIds(new Set(res.data))
+    })
+    rolesApi.query({ page: 1, pageSize: 200 }).then((res) => {
+      if (res.code === 200 && res.data) setAllRoles(res.data.items)
     })
   }, [id])
 
@@ -114,6 +123,59 @@ export default function EditUserPage() {
             </Link>
           </div>
         </form>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-card p-8 mt-6">
+        <h2 className="text-lg font-semibold text-gray-800 mb-4">角色分配</h2>
+        <p className="text-sm text-gray-500 mb-4">勾选该用户拥有的角色，然后点击「保存角色」。</p>
+        <div className="flex flex-wrap gap-4 mb-4">
+          {allRoles.map((r) => (
+            <label
+              key={r.id}
+              className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
+            >
+              <input
+                type="checkbox"
+                checked={selectedRoleIds.has(r.id)}
+                onChange={() => {
+                  setSelectedRoleIds((prev) => {
+                    const next = new Set(prev)
+                    if (next.has(r.id)) next.delete(r.id)
+                    else next.add(r.id)
+                    return next
+                  })
+                }}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-900">
+                {r.name} <span className="text-gray-400">({r.code})</span>
+              </span>
+            </label>
+          ))}
+        </div>
+        {allRoles.length === 0 && (
+          <p className="text-sm text-gray-400 mb-4">暂无角色数据</p>
+        )}
+        <button
+          type="button"
+          disabled={rolesSubmitting}
+          className="px-5 py-2 rounded-lg font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 shadow-sm"
+          onClick={async () => {
+            setRolesSubmitting(true)
+            setError('')
+            try {
+              const res = await usersApi.setRoles(id, Array.from(selectedRoleIds))
+              if (res.code === 200) alert('角色已保存')
+              else setError(res.message || '保存角色失败')
+            } catch {
+              setError('请求失败')
+            } finally {
+              setRolesSubmitting(false)
+            }
+          }}
+        >
+          {rolesSubmitting ? '保存中...' : '保存角色'}
+        </button>
       </div>
     </div>
   )

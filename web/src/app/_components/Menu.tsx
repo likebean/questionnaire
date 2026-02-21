@@ -18,6 +18,8 @@ export default function Menu() {
   const adminItems = [
     { href: '/users', icon: 'fas fa-users', label: '用户管理' },
     { href: '/accounts', icon: 'fas fa-key', label: '账号管理' },
+    { href: '/roles', icon: 'fas fa-user-tag', label: '角色管理' },
+    { href: '/permissions', icon: 'fas fa-shield-alt', label: '权限管理' },
   ]
 
   const groups: { group: string; items: typeof mainItems }[] = [

@@ -64,7 +64,7 @@ const apiClient = axios.create({
 })
 
 apiClient.interceptors.response.use(
-  (response) => response.data as ApiResponse<unknown>,
+  (response) => response.data as unknown as typeof response,
   (error) => Promise.reject(error)
 )
 
@@ -103,6 +103,10 @@ export const usersApi = {
     apiClient.put(`/users/${id}`, user) as Promise<ApiResponse<null>>,
   delete: (id: string) =>
     apiClient.delete(`/users/${id}`) as Promise<ApiResponse<null>>,
+  getRoleIds: (userId: string) =>
+    apiClient.get(`/users/${userId}/roles`) as Promise<ApiResponse<number[]>>,
+  setRoles: (userId: string, roleIds: number[]) =>
+    apiClient.put(`/users/${userId}/roles`, roleIds) as Promise<ApiResponse<null>>,
 }
 
 export const accountsApi = {
@@ -116,4 +120,51 @@ export const accountsApi = {
     apiClient.post('/accounts', data) as Promise<ApiResponse<null>>,
   delete: (id: number) =>
     apiClient.delete(`/accounts/${id}`) as Promise<ApiResponse<null>>,
+}
+
+export interface RoleVO {
+  id: number
+  code: string
+  name: string
+  description: string | null
+  sort: number | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface PermissionVO {
+  id: number
+  name: string
+  resourceType: string | null
+  action: string | null
+  dataScope: string | null
+  description: string | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export const rolesApi = {
+  query: (params?: { keyword?: string; page?: number; pageSize?: number }) =>
+    apiClient.get('/roles/query', { params }) as Promise<ApiResponse<PaginatedResponse<RoleVO>>>,
+  getById: (id: number) =>
+    apiClient.get(`/roles/${id}`) as Promise<ApiResponse<RoleVO>>,
+  create: (role: { name: string; code: string; description?: string | null; sort?: number | null }) =>
+    apiClient.post('/roles', role) as Promise<ApiResponse<null>>,
+  update: (id: number, role: { name?: string; code?: string; description?: string | null; sort?: number | null }) =>
+    apiClient.put(`/roles/${id}`, role) as Promise<ApiResponse<null>>,
+  delete: (id: number) =>
+    apiClient.delete(`/roles/${id}`) as Promise<ApiResponse<null>>,
+  getPermissionIds: (roleId: number) =>
+    apiClient.get(`/roles/${roleId}/permissions`) as Promise<ApiResponse<number[]>>,
+  assignPermissions: (roleId: number, permissionIds: number[]) =>
+    apiClient.put(`/roles/${roleId}/permissions`, permissionIds) as Promise<ApiResponse<null>>,
+}
+
+export const permissionsApi = {
+  query: (params?: { keyword?: string; resourceType?: string; page?: number; pageSize?: number }) =>
+    apiClient.get('/permissions/query', { params }) as Promise<ApiResponse<PaginatedResponse<PermissionVO>>>,
+  getAll: () =>
+    apiClient.get('/permissions/all') as Promise<ApiResponse<PermissionVO[]>>,
+  getById: (id: number) =>
+    apiClient.get(`/permissions/${id}`) as Promise<ApiResponse<PermissionVO>>,
 }

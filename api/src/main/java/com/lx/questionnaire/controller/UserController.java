@@ -77,4 +77,20 @@ public class UserController {
         userService.deleteUser(id);
         return Result.ok();
     }
+
+    @GetMapping("/{id}/roles")
+    public Result<List<Long>> getUserRoleIds(@PathVariable String id) {
+        requireSchoolAdmin();
+        if (userService.getById(id) == null) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
+        return Result.ok(userService.getRoleIdsByUserId(id));
+    }
+
+    @PutMapping("/{id}/roles")
+    public Result<Void> setUserRoles(@PathVariable String id, @RequestBody List<Long> roleIds) {
+        requireSchoolAdmin();
+        userService.setUserRoles(id, roleIds);
+        return Result.ok();
+    }
 }
