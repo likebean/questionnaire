@@ -7,12 +7,12 @@ import com.lx.questionnaire.security.CurrentUserDetails;
 import com.lx.questionnaire.service.AuthService;
 import com.lx.questionnaire.service.CasValidateService;
 import com.lx.questionnaire.service.UserService;
+import com.lx.questionnaire.util.SecurityUtils;
 import com.lx.questionnaire.vo.CurrentUserVO;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,7 +37,7 @@ public class AuthController {
 
     @GetMapping("/me")
     public Result<CurrentUserVO> getCurrentUser() {
-        String userId = getCurrentUserId();
+        String userId = SecurityUtils.getCurrentUserId();
         if (userId == null) {
             return Result.fail(401, "未登录");
         }
@@ -107,13 +107,5 @@ public class AuthController {
         if (base == null) base = "http://localhost:3000";
         String url = base + "/auth/login?error=" + URLEncoder.encode(message, StandardCharsets.UTF_8);
         response.sendRedirect(url);
-    }
-
-    private String getCurrentUserId() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated() || !(auth.getPrincipal() instanceof CurrentUserDetails)) {
-            return null;
-        }
-        return ((CurrentUserDetails) auth.getPrincipal()).getUsername();
     }
 }
