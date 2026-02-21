@@ -32,9 +32,9 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="max-w-md w-full space-y-6 p-8 bg-white rounded-xl shadow">
+      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 text-center">问卷系统</h1>
+          <h2 className="text-center text-3xl font-extrabold text-gray-900">问卷系统</h2>
           <p className="text-gray-500 text-center text-sm mt-1">高校问卷管理与填写</p>
         </div>
         <form className="space-y-4" onSubmit={handleSubmit}>

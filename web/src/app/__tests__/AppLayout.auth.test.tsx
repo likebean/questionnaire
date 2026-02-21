@@ -95,6 +95,7 @@ describe('AppLayout - 访问受限与登录页', () => {
     expect(screen.getByText('首页内容')).toBeInTheDocument()
     expect(screen.getByText('测试用户')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '我的问卷' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '退出' })).toBeInTheDocument()
+    // 用户菜单（顶栏触发按钮，下拉内才有「退出登录」）
+    expect(screen.getByRole('button', { name: /测试用户/ })).toBeInTheDocument()
   })
 })

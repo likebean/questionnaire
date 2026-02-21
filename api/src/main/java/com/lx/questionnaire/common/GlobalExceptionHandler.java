@@ -19,7 +19,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<Result<Void>> handleBusinessException(HttpServletRequest request, BusinessException e) {
         log.warn("业务异常: {} - {} {}", e.getMessage(), request.getMethod(), request.getRequestURI());
-        return buildResponse(HttpStatus.CONFLICT, e.getErrorCode());
+        int code = e.getErrorCode().getCode();
+        HttpStatus status = code == 401 ? HttpStatus.UNAUTHORIZED
+                : code == 403 ? HttpStatus.FORBIDDEN
+                : code == 404 ? HttpStatus.NOT_FOUND
+                : HttpStatus.BAD_REQUEST;
+        return buildResponse(status, e.getErrorCode());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

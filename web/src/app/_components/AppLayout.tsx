@@ -4,9 +4,11 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { useAuth } from '@/app/_components/AuthContext'
+import { UserMenu } from '@/app/_components/UserMenu'
+import Menu from '@/app/_components/Menu'
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading, logout } = useAuth()
+  const { user, loading } = useAuth()
   const pathname = usePathname()
   const router = useRouter()
   const isLoginPage = pathname?.startsWith('/auth/login') ?? false
@@ -24,37 +26,45 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (loading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <p className="text-gray-500">加载中...</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <Link href="/" className="font-semibold text-gray-800 hover:text-blue-600">
-              问卷系统
-            </Link>
-            <Link href="/surveys" className="text-gray-600 hover:text-blue-600">
-              我的问卷
-            </Link>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-500">{user.nickname || user.id}</span>
-            <button
-              type="button"
-              onClick={logout}
-              className="text-sm text-gray-500 hover:text-gray-700"
-            >
-              退出
-            </button>
-          </div>
+    <>
+      {/* 顶部导航栏：与 ai-plugin 一致 */}
+      <nav className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
+        <div className="flex items-center">
+          <Link
+            href="/"
+            className="text-xl font-bold text-blue-600 flex items-center"
+          >
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
+              <span className="text-white font-bold text-sm">问</span>
+            </div>
+            <span>问卷系统</span>
+          </Link>
         </div>
-      </header>
-      <main>{children}</main>
-    </div>
+        <div className="flex items-center space-x-8">
+          <UserMenu />
+        </div>
+      </nav>
+      {/* 主体：左侧菜单 + 主内容区 */}
+      <div className="flex h-[calc(100vh-64px)]">
+        <aside className="w-64 bg-white border-r border-gray-200 flex-shrink-0 h-full">
+          <div className="pt-5 pb-5 px-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-semibold text-gray-700">主导航</h2>
+            </div>
+          </div>
+          <Menu />
+        </aside>
+        <main className="flex-1 min-w-0 p-8 overflow-auto bg-gray-100">
+          {children}
+        </main>
+      </div>
+    </>
   )
 }

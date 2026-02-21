@@ -42,35 +42,38 @@ public class DevUserInitializer implements ApplicationRunner {
                 new LambdaQueryWrapper<Account>()
                         .eq(Account::getLoginId, DEV_LOGIN_ID)
                         .eq(Account::getAuthSource, "local"));
-        if (existing != null) {
-            return;
+        if (existing == null) {
+            if (userMapper.selectById(DEV_USER_ID) == null) {
+                User user = new User();
+                user.setId(DEV_USER_ID);
+                user.setNickname("开发管理员");
+                userMapper.insert(user);
+                log.info("Created dev user: {}", DEV_USER_ID);
+            }
+            Account account = new Account();
+            account.setUserId(DEV_USER_ID);
+            account.setLoginId(DEV_LOGIN_ID);
+            account.setAuthSource("local");
+            account.setPasswordHash(passwordEncoder.encode(DEV_PASSWORD));
+            accountMapper.insert(account);
+            log.info("Created dev local account: {} / {}", DEV_LOGIN_ID, DEV_PASSWORD);
         }
-        if (userMapper.selectById(DEV_USER_ID) == null) {
-            User user = new User();
-            user.setId(DEV_USER_ID);
-            user.setNickname("开发管理员");
-            userMapper.insert(user);
-            log.info("Created dev user: {}", DEV_USER_ID);
-        }
-        Account account = new Account();
-        account.setUserId(DEV_USER_ID);
-        account.setLoginId(DEV_LOGIN_ID);
-        account.setAuthSource("local");
-        account.setPasswordHash(passwordEncoder.encode(DEV_PASSWORD));
-        accountMapper.insert(account);
-        Role userRole = roleMapper.selectOne(new LambdaQueryWrapper<Role>().eq(Role::getCode, "USER"));
-        if (userRole != null) {
-            Long cnt = userRoleMapper.selectCount(
-                    new LambdaQueryWrapper<UserRole>()
-                            .eq(UserRole::getUserId, DEV_USER_ID)
-                            .eq(UserRole::getRoleId, userRole.getId()));
-            if (cnt == 0) {
-                UserRole ur = new UserRole();
-                ur.setUserId(DEV_USER_ID);
-                ur.setRoleId(userRole.getId());
-                userRoleMapper.insert(ur);
+        // 无论账号是否已存在，都确保 dev-admin 拥有 USER + SCHOOL_ADMIN（便于已有环境看到用户/账号管理菜单）
+        for (String roleCode : new String[]{"USER", "SCHOOL_ADMIN"}) {
+            Role role = roleMapper.selectOne(new LambdaQueryWrapper<Role>().eq(Role::getCode, roleCode));
+            if (role != null) {
+                Long cnt = userRoleMapper.selectCount(
+                        new LambdaQueryWrapper<UserRole>()
+                                .eq(UserRole::getUserId, DEV_USER_ID)
+                                .eq(UserRole::getRoleId, role.getId()));
+                if (cnt == 0) {
+                    UserRole ur = new UserRole();
+                    ur.setUserId(DEV_USER_ID);
+                    ur.setRoleId(role.getId());
+                    userRoleMapper.insert(ur);
+                    log.info("Assigned role {} to dev user {}", roleCode, DEV_USER_ID);
+                }
             }
         }
-        log.info("Created dev local account: {} / {}", DEV_LOGIN_ID, DEV_PASSWORD);
     }
 }

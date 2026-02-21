@@ -2,14 +2,58 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body {
+html, body, #__next {
   height: 100%;
   min-height: 100%;
+  width: 100%;
   margin: 0;
   padding: 0;
 }
 
 body {
   color: rgb(15 23 42);
-  background: rgb(248 250 252);
+}
+
+/* 与 ai-plugin 对齐：圆角、表格、状态标签 */
+button, .btn, input, select, textarea, .rounded, .rounded-md, .rounded-lg, .rounded-xl {
+  border-radius: 0.75rem;
+}
+.table-modern th {
+  background-color: #f3f4f6;
+  font-weight: 600;
+  padding: 1rem;
+  text-align: left;
+  color: #4b5563;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+.table-modern td {
+  padding: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  color: #374151;
+}
+.table-modern tbody tr:hover {
+  background-color: #f9fafb;
+}
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+}
+.status-badge.success { background-color: rgba(16, 185, 129, 0.1); color: #10b981; }
+.status-badge.warning { background-color: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+.status-badge.danger { background-color: rgba(239, 68, 68, 0.1); color: #ef4444; }
+.status-badge.info { background-color: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+
+/* 与 ai-plugin 一致 */
+.shadow-card {
+  box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05), 0 4px 6px -2px rgba(0,0,0,0.025);
+}
+.shadow-card-hover:hover {
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.08), 0 10px 10px -5px rgba(0,0,0,0.04);
+  transform: translateY(-2px);
 }

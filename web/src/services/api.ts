@@ -22,6 +22,40 @@ export interface CurrentUserVO {
   roleCodes: string[]
 }
 
+export interface PaginatedResponse<T> {
+  items: T[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export interface UserVO {
+  id: string
+  nickname: string | null
+  email: string | null
+  phone: string | null
+  identityType: string | null
+  departmentId: number | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface AccountVO {
+  id: number
+  userId: string
+  loginId: string
+  authSource: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface CreateAccountRequest {
+  userId: string
+  loginId: string
+  authSource: string
+  password?: string
+}
+
 const apiClient = axios.create({
   baseURL: '/api',
   timeout: 10000,
@@ -56,4 +90,30 @@ export const authApi = {
     apiClient.post('/auth/logout') as Promise<ApiResponse<unknown>>,
 
   getCasLoginUrl: (): string => '/api/auth/cas/login',
+}
+
+export const usersApi = {
+  query: (params?: { keyword?: string; departmentId?: number; page?: number; pageSize?: number }) =>
+    apiClient.get('/users/query', { params }) as Promise<ApiResponse<PaginatedResponse<UserVO>>>,
+  getById: (id: string) =>
+    apiClient.get(`/users/${id}`) as Promise<ApiResponse<UserVO>>,
+  create: (user: Partial<UserVO>) =>
+    apiClient.post('/users', user) as Promise<ApiResponse<null>>,
+  update: (id: string, user: Partial<UserVO>) =>
+    apiClient.put(`/users/${id}`, user) as Promise<ApiResponse<null>>,
+  delete: (id: string) =>
+    apiClient.delete(`/users/${id}`) as Promise<ApiResponse<null>>,
+}
+
+export const accountsApi = {
+  query: (params?: { keyword?: string; page?: number; pageSize?: number }) =>
+    apiClient.get('/accounts/query', { params }) as Promise<ApiResponse<PaginatedResponse<AccountVO>>>,
+  getById: (id: number) =>
+    apiClient.get(`/accounts/${id}`) as Promise<ApiResponse<AccountVO>>,
+  getByUserId: (userId: string) =>
+    apiClient.get(`/accounts/user/${userId}`) as Promise<ApiResponse<AccountVO[]>>,
+  create: (data: CreateAccountRequest) =>
+    apiClient.post('/accounts', data) as Promise<ApiResponse<null>>,
+  delete: (id: number) =>
+    apiClient.delete(`/accounts/${id}`) as Promise<ApiResponse<null>>,
 }

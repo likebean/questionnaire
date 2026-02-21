@@ -18,7 +18,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-CN">
-      <body className={inter.className}>
+      <head>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+      </head>
+      <body className={inter.className + ' bg-gray-100 min-h-screen'}>
         <AuthProvider>
           <AppLayout>{children}</AppLayout>
         </AuthProvider>
