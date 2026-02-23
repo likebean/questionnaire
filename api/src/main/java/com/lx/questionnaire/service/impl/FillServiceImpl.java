@@ -22,7 +22,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +36,12 @@ public class FillServiceImpl implements FillService {
     private static final String VALUE_TYPE_OPTION = "OPTION";
     private static final String VALUE_TYPE_TEXT = "TEXT";
     private static final String VALUE_TYPE_SCALE = "SCALE";
+    private static final int SUBMIT_VALIDATION_CODE = 4005;
+    private static final String TYPE_SINGLE = "SINGLE_CHOICE";
+    private static final String TYPE_MULTIPLE = "MULTIPLE_CHOICE";
+    private static final String TYPE_SHORT_TEXT = "SHORT_TEXT";
+    private static final String TYPE_LONG_TEXT = "LONG_TEXT";
+    private static final String TYPE_SCALE = "SCALE";
 
     private final SurveyMapper surveyMapper;
     private final SurveyQuestionMapper surveyQuestionMapper;
@@ -78,6 +85,12 @@ public class FillServiceImpl implements FillService {
     public void submit(Long surveyId, String userId, SubmitRequestDTO request) {
         getFillMetadata(surveyId, userId);
 
+        List<SurveyQuestion> questions = surveyQuestionMapper.selectList(
+                new LambdaQueryWrapper<SurveyQuestion>().eq(SurveyQuestion::getSurveyId, surveyId).orderByAsc(SurveyQuestion::getSortOrder));
+        Map<Long, SurveyQuestion> questionMap = questions.stream().collect(Collectors.toMap(SurveyQuestion::getId, q -> q));
+
+        validateSubmitItems(surveyId, request.getItems(), questionMap);
+
         Response r = new Response();
         r.setSurveyId(surveyId);
         r.setUserId(userId);
@@ -88,27 +101,138 @@ public class FillServiceImpl implements FillService {
         if (request.getItems() != null) {
             for (SubmitItemDTO item : request.getItems()) {
                 if (item.getQuestionId() == null) continue;
-                ResponseItem ri = new ResponseItem();
-                ri.setResponseId(r.getId());
-                ri.setQuestionId(item.getQuestionId());
-                if (item.getOptionIndex() != null) {
-                    ri.setValueType(VALUE_TYPE_OPTION);
-                    ri.setOptionIndex(item.getOptionIndex());
-                } else if (item.getOptionIndices() != null && item.getOptionIndices().length > 0) {
-                    ri.setValueType(VALUE_TYPE_OPTION);
-                    ri.setOptionIndices(toJsonArray(item.getOptionIndices()));
-                } else if (item.getTextValue() != null) {
-                    ri.setValueType(VALUE_TYPE_TEXT);
-                    ri.setTextValue(item.getTextValue());
-                } else if (item.getScaleValue() != null) {
-                    ri.setValueType(VALUE_TYPE_SCALE);
-                    ri.setScaleValue(item.getScaleValue());
-                } else {
-                    continue;
+                ResponseItem ri = buildResponseItem(item, r.getId());
+                if (ri != null) {
+                    responseItemMapper.insert(ri);
                 }
-                responseItemMapper.insert(ri);
             }
         }
+    }
+
+    private void validateSubmitItems(Long surveyId, List<SubmitItemDTO> items, Map<Long, SurveyQuestion> questionMap) {
+        if (items == null) items = List.of();
+
+        Set<Long> answeredIds = new HashSet<>();
+        for (SubmitItemDTO item : items) {
+            if (item.getQuestionId() == null) continue;
+            SurveyQuestion q = questionMap.get(item.getQuestionId());
+            if (q == null) {
+                throw new BusinessException(ErrorCode.fail(SUBMIT_VALIDATION_CODE, "题目不属于本问卷"));
+            }
+            if (answeredIds.contains(item.getQuestionId())) {
+                throw new BusinessException(ErrorCode.fail(SUBMIT_VALIDATION_CODE, "同一题目不能重复作答"));
+            }
+            answeredIds.add(item.getQuestionId());
+            validateItemValue(item, q);
+        }
+
+        for (SurveyQuestion q : questionMap.values()) {
+            if (Boolean.TRUE.equals(q.getRequired()) && !answeredIds.contains(q.getId())) {
+                throw new BusinessException(ErrorCode.fail(SUBMIT_VALIDATION_CODE, "请完成必填题：" + (q.getTitle() != null ? q.getTitle() : "题目" + q.getId())));
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void validateItemValue(SubmitItemDTO item, SurveyQuestion q) {
+        String type = q.getType();
+        Map<String, Object> config = parseConfig(q.getConfig());
+
+        switch (type == null ? "" : type) {
+            case TYPE_SINGLE -> {
+                if (item.getOptionIndex() == null) {
+                    throw new BusinessException(ErrorCode.fail(SUBMIT_VALIDATION_CODE, "请选择选项：" + q.getTitle()));
+                }
+                int optionCount = getOptionsCount(config);
+                if (item.getOptionIndex() < 0 || item.getOptionIndex() >= optionCount) {
+                    throw new BusinessException(ErrorCode.fail(SUBMIT_VALIDATION_CODE, "选项无效：" + q.getTitle()));
+                }
+            }
+            case TYPE_MULTIPLE -> {
+                if (item.getOptionIndices() == null || item.getOptionIndices().length == 0) {
+                    if (Boolean.TRUE.equals(q.getRequired())) {
+                        throw new BusinessException(ErrorCode.fail(SUBMIT_VALIDATION_CODE, "请至少选择一项：" + q.getTitle()));
+                    }
+                    break;
+                }
+                int optCount = getOptionsCount(config);
+                for (int idx : item.getOptionIndices()) {
+                    if (idx < 0 || idx >= optCount) {
+                        throw new BusinessException(ErrorCode.fail(SUBMIT_VALIDATION_CODE, "选项无效：" + q.getTitle()));
+                    }
+                }
+                int minC = getInt(config, "minChoices", 0);
+                int maxC = getInt(config, "maxChoices", Integer.MAX_VALUE);
+                int chosen = item.getOptionIndices().length;
+                if (chosen < minC) {
+                    throw new BusinessException(ErrorCode.fail(SUBMIT_VALIDATION_CODE, "至少选 " + minC + " 项：" + q.getTitle()));
+                }
+                if (chosen > maxC) {
+                    throw new BusinessException(ErrorCode.fail(SUBMIT_VALIDATION_CODE, "最多选 " + maxC + " 项：" + q.getTitle()));
+                }
+            }
+            case TYPE_SHORT_TEXT, TYPE_LONG_TEXT -> {
+                if (item.getTextValue() == null && Boolean.TRUE.equals(q.getRequired())) {
+                    throw new BusinessException(ErrorCode.fail(SUBMIT_VALIDATION_CODE, "请填写：" + q.getTitle()));
+                }
+            }
+            case TYPE_SCALE -> {
+                if (item.getScaleValue() == null) {
+                    throw new BusinessException(ErrorCode.fail(SUBMIT_VALIDATION_CODE, "请选择分值：" + q.getTitle()));
+                }
+                int minS = getInt(config, "scaleMin", 1);
+                int maxS = getInt(config, "scaleMax", 5);
+                if (item.getScaleValue() < minS || item.getScaleValue() > maxS) {
+                    throw new BusinessException(ErrorCode.fail(SUBMIT_VALIDATION_CODE, "分值需在 " + minS + "～" + maxS + " 之间：" + q.getTitle()));
+                }
+            }
+            default -> throw new BusinessException(ErrorCode.fail(SUBMIT_VALIDATION_CODE, "不支持的题型：" + type));
+        }
+    }
+
+    private ResponseItem buildResponseItem(SubmitItemDTO item, Long responseId) {
+        ResponseItem ri = new ResponseItem();
+        ri.setResponseId(responseId);
+        ri.setQuestionId(item.getQuestionId());
+        if (item.getOptionIndex() != null) {
+            ri.setValueType(VALUE_TYPE_OPTION);
+            ri.setOptionIndex(item.getOptionIndex());
+        } else if (item.getOptionIndices() != null && item.getOptionIndices().length > 0) {
+            ri.setValueType(VALUE_TYPE_OPTION);
+            ri.setOptionIndices(toJsonArray(item.getOptionIndices()));
+        } else if (item.getTextValue() != null) {
+            ri.setValueType(VALUE_TYPE_TEXT);
+            ri.setTextValue(item.getTextValue());
+        } else if (item.getScaleValue() != null) {
+            ri.setValueType(VALUE_TYPE_SCALE);
+            ri.setScaleValue(item.getScaleValue());
+        } else {
+            return null;
+        }
+        return ri;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseConfig(String configJson) {
+        if (configJson == null || configJson.isBlank()) return Map.of();
+        try {
+            return objectMapper.readValue(configJson, Map.class);
+        } catch (Exception e) {
+            return Map.of();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private int getOptionsCount(Map<String, Object> config) {
+        Object opts = config.get("options");
+        if (opts instanceof List) return ((List<?>) opts).size();
+        return 0;
+    }
+
+    private int getInt(Map<String, Object> config, String key, int defaultValue) {
+        Object v = config != null ? config.get(key) : null;
+        if (v instanceof Number) return ((Number) v).intValue();
+        return defaultValue;
     }
 
     private String toJsonArray(int[] arr) {
