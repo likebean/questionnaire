@@ -24,6 +24,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/health").permitAll()
                         .requestMatchers("/auth/login").permitAll()
                         .requestMatchers("/api/auth/cas/login", "/api/auth/cas/callback").permitAll()
+                        .requestMatchers("/api/fill/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .formLogin(form -> form
