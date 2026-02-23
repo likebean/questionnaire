@@ -65,7 +65,15 @@ cd web
 npm run test:e2e
 ```
 
-- 用例位置：`web/e2e/`（`user-flow.spec.ts` 为完整用户流程，`home.spec.ts` 为首页与健康检查，`roles-permissions.spec.ts` 为校管角色/权限页）。
+- 用例位置：`web/e2e/`
+  - `user-flow.spec.ts`：完整用户流程（登录→首页→我的问卷）
+  - `users-crud.spec.ts`：用户管理增删改查
+  - `accounts-crud.spec.ts`：账号管理增删改查
+  - `departments-crud.spec.ts`：院系管理增删改查
+  - `roles-crud.spec.ts`：角色管理增删改查
+  - `permissions.spec.ts`：权限管理列表、筛选、编辑
+  - `roles-permissions.spec.ts`：校管菜单与角色/权限/用户编辑页
+  - `home.spec.ts`：首页与健康检查
 - **后端未启动**时，依赖 `/api` 的用例（如登录、我的问卷）会失败。
 
 ---
