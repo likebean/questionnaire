@@ -52,16 +52,21 @@ npm run dev
 - **后端**：`cd api && mvn test`（含 `HealthControllerTest`）
 - **前端**：`cd web && npm run test`（含首页组件单测）
 
-### 页面测试（E2E）
+### 页面测试（E2E，模拟用户完整操作）
 
-需先启动后端与前端，再运行：
+E2E 在**真实浏览器**中访问页面、输入、点击，并请求**真实后端**，覆盖完整用户流程（未登录→登录→首页→我的问卷→返回首页等）。
+
+1. **首次运行**需安装 Playwright 浏览器：`cd web && npx playwright install`
+2. **启动后端**（E2E 中登录、问卷列表等会请求 `/api`）：`cd api && ./mvnw spring-boot:run`
+3. 运行 E2E（Playwright 会自动启动前端，或复用已运行的 3000 端口）：
 
 ```bash
 cd web
 npm run test:e2e
 ```
 
-- 使用 Playwright，会启动前端并访问首页；**后端需已运行**，否则「UP / questionnaire-api」相关用例会因接口失败而报错。
+- 用例位置：`web/e2e/`（`user-flow.spec.ts` 为完整用户流程，`home.spec.ts` 为首页与健康检查，`roles-permissions.spec.ts` 为校管角色/权限页）。
+- **后端未启动**时，依赖 `/api` 的用例（如登录、我的问卷）会失败。
 
 ---
 

@@ -1,5 +1,10 @@
 import { defineConfig, devices } from '@playwright/test'
 
+/**
+ * E2E 会启动前端（webServer）；完整用户流程（登录、我的问卷等）需先启动后端：
+ *   cd api && ./mvnw spring-boot:run
+ * 否则与 /api 相关的用例会失败。
+ */
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
