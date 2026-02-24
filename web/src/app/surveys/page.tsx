@@ -17,6 +17,103 @@ const STATUS_LABELS: Record<string, string> = {
   ENDED: '已结束',
 }
 
+function SurveyCard({
+  item,
+  canShowResponses,
+  onDone,
+  onDelete,
+  router,
+}: {
+  item: SurveyListItemVO
+  canShowResponses: (s: SurveyListItemVO) => boolean
+  onDone: () => void
+  onDelete: () => void
+  router: ReturnType<typeof useRouter>
+}) {
+  const statusClass =
+    item.status === 'DRAFT'
+      ? 'info'
+      : item.status === 'COLLECTING'
+        ? 'success'
+        : item.status === 'PAUSED'
+          ? 'warning'
+          : ''
+
+  return (
+    <div className="bg-white rounded-lg shadow hover:shadow-lg transition-all duration-200 p-6 border border-gray-200 group relative pb-14">
+      <div className="flex justify-between items-start mb-3">
+        <div className="flex-1 min-w-0">
+          <Link
+            href={`/surveys/${item.id}/edit`}
+            className="text-lg font-semibold text-gray-900 hover:text-blue-600 truncate block"
+          >
+            {item.title || '未命名问卷'}
+          </Link>
+          <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
+            <span>回收 {canShowResponses(item) ? item.responseCount ?? 0 : '—'} 份</span>
+            <span>·</span>
+            <span>
+              {item.updatedAt ? new Date(item.updatedAt).toLocaleDateString('zh-CN') : '—'}
+            </span>
+          </div>
+        </div>
+        <span className={`status-badge ${statusClass} shrink-0`}>
+          {STATUS_LABELS[item.status] ?? item.status}
+        </span>
+      </div>
+      <div className="absolute bottom-4 left-4 right-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200 flex flex-wrap items-center gap-1">
+        <Link
+          href={`/surveys/${item.id}/edit`}
+          className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+          title="设计问卷"
+        >
+          <i className="fas fa-edit" />
+        </Link>
+        <Link
+          href={`/surveys/${item.id}/settings`}
+          className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+          title="设置"
+        >
+          <i className="fas fa-cog" />
+        </Link>
+        {canShowResponses(item) && (
+          <>
+            <Link
+              href={`/surveys/${item.id}/responses`}
+              className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+              title="查看答卷"
+            >
+              <i className="fas fa-list-alt" />
+            </Link>
+            <Link
+              href={`/surveys/${item.id}/analytics`}
+              className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+              title="统计分析"
+            >
+              <i className="fas fa-chart-bar" />
+            </Link>
+          </>
+        )}
+        <SurveyStatusActions item={item} onDone={onDone} />
+        <span className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 inline-flex">
+          <CopyFillLinkButton surveyId={item.id} />
+        </span>
+        <span className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 inline-flex">
+          <CopySurveyButton surveyId={item.id} router={router} onDone={onDone} />
+        </span>
+        <button
+          type="button"
+          onClick={onDelete}
+          title="删除"
+          className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+        >
+          <i className="fas fa-trash" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function MySurveysPage() {
   const router = useRouter()
   const [data, setData] = useState<SurveyListResponse | null>(null)
@@ -151,130 +248,28 @@ export default function MySurveysPage() {
         </form>
       </div>
 
-      <div className="bg-white rounded-xl shadow overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                  问卷标题
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                  状态
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                  回收数
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                  更新时间
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                  操作
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className="text-center py-8 text-gray-400">
-                    加载中...
-                  </td>
-                </tr>
-              ) : !data?.list?.length ? (
-                <tr>
-                  <td colSpan={5} className="text-center py-8 text-gray-400">
-                    暂无问卷。点击「创建问卷」开始，填写通过分享链接参与。
-                  </td>
-                </tr>
-              ) : (
-                data.list.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <Link
-                        href={`/surveys/${item.id}/edit`}
-                        className="text-blue-600 hover:text-blue-800 font-medium"
-                      >
-                        {item.title || '未命名问卷'}
-                      </Link>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span
-                        className={
-                          'status-badge ' +
-                          (item.status === 'DRAFT'
-                            ? 'info'
-                            : item.status === 'COLLECTING'
-                              ? 'success'
-                              : item.status === 'PAUSED'
-                                ? 'warning'
-                                : '')
-                        }
-                      >
-                        {STATUS_LABELS[item.status] ?? item.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {canShowResponses(item) ? (item.responseCount ?? 0) : '—'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {item.updatedAt
-                        ? new Date(item.updatedAt).toLocaleString('zh-CN')
-                        : '—'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <div className="flex justify-end items-center space-x-3">
-                        <Link
-                          href={`/surveys/${item.id}/edit`}
-                          className="text-gray-600 hover:text-gray-900"
-                          title="设计问卷"
-                        >
-                          <i className="fas fa-edit" />
-                        </Link>
-                        <Link
-                          href={`/surveys/${item.id}/settings`}
-                          className="text-gray-600 hover:text-gray-900"
-                          title="设置"
-                        >
-                          <i className="fas fa-cog" />
-                        </Link>
-                        {canShowResponses(item) && (
-                          <>
-                            <Link
-                              href={`/surveys/${item.id}/responses`}
-                              className="text-gray-600 hover:text-gray-900"
-                              title="查看答卷"
-                            >
-                              <i className="fas fa-list-alt" />
-                            </Link>
-                            <Link
-                              href={`/surveys/${item.id}/analytics`}
-                              className="text-gray-600 hover:text-gray-900"
-                              title="统计分析"
-                            >
-                              <i className="fas fa-chart-bar" />
-                            </Link>
-                          </>
-                        )}
-                        <SurveyStatusActions item={item} onDone={load} />
-                        <CopyFillLinkButton surveyId={item.id} />
-                        <CopySurveyButton surveyId={item.id} router={router} onDone={load} />
-                        <button
-                          type="button"
-                          className="text-gray-500 hover:text-red-600"
-                          title="删除"
-                          onClick={() => setDeleteTarget(item)}
-                        >
-                          <i className="fas fa-trash" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+      {loading ? (
+        <div className="bg-white rounded-lg shadow-card p-12 text-center text-gray-500">
+          加载中...
         </div>
-      </div>
+      ) : !data?.list?.length ? (
+        <div className="bg-white rounded-lg shadow-card p-12 text-center text-gray-500">
+          暂无问卷。点击「创建问卷」开始，填写通过分享链接参与。
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {data.list.map((item) => (
+            <SurveyCard
+              key={item.id}
+              item={item}
+              canShowResponses={canShowResponses}
+              onDone={load}
+              onDelete={() => setDeleteTarget(item)}
+              router={router}
+            />
+          ))}
+        </div>
+      )}
 
       {data !== null && (
         <div className="mt-4 flex justify-between items-center">
@@ -373,6 +368,8 @@ function SurveyStatusActions({
       .catch((e) => alert(e?.response?.data?.message ?? '操作失败'))
       .finally(() => setLoading(false))
   }
+  const btnClass =
+    'p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-50'
   if (item.status === 'COLLECTING') {
     return (
       <>
@@ -381,7 +378,7 @@ function SurveyStatusActions({
           title="暂停回收"
           disabled={loading}
           onClick={() => onAction(() => surveysApi.pause(item.id))}
-          className="text-gray-600 hover:text-gray-900 disabled:opacity-50"
+          className={btnClass}
         >
           <i className="fas fa-pause" />
         </button>
@@ -393,7 +390,7 @@ function SurveyStatusActions({
             if (!window.confirm('结束后将无法再接收新答卷，确定结束问卷吗？')) return
             onAction(() => surveysApi.end(item.id))
           }}
-          className="text-gray-600 hover:text-gray-900 disabled:opacity-50"
+          className={btnClass}
         >
           <i className="fas fa-stop" />
         </button>
@@ -408,7 +405,7 @@ function SurveyStatusActions({
           title="重新开启"
           disabled={loading}
           onClick={() => onAction(() => surveysApi.resume(item.id))}
-          className="text-gray-600 hover:text-gray-900 disabled:opacity-50"
+          className={btnClass}
         >
           <i className="fas fa-play" />
         </button>
@@ -420,7 +417,7 @@ function SurveyStatusActions({
             if (!window.confirm('结束后将无法再接收新答卷，确定结束问卷吗？')) return
             onAction(() => surveysApi.end(item.id))
           }}
-          className="text-gray-600 hover:text-gray-900 disabled:opacity-50"
+          className={btnClass}
         >
           <i className="fas fa-stop" />
         </button>

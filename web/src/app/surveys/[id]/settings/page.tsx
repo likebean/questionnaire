@@ -22,8 +22,6 @@ export default function SettingsPage() {
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
   const [thankYouText, setThankYouText] = useState('')
-  const [fillUrl, setFillUrl] = useState('')
-  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -45,14 +43,6 @@ export default function SettingsPage() {
       .finally(() => setLoading(false))
   }, [id])
 
-  useEffect(() => {
-    if (!id) return
-    surveysApi.getFillUrl(id).then((res) => {
-      const path = res?.data?.fillUrl ?? `/fill/${id}`
-      setFillUrl(typeof window !== 'undefined' ? `${window.location.origin}${path}` : path)
-    })
-  }, [id])
-
   const handleSave = () => {
     if (!id) return
     setSaving(true)
@@ -72,13 +62,6 @@ export default function SettingsPage() {
         setSaving(false)
       })
       .catch(() => setSaving(false))
-  }
-
-  const copyUrl = () => {
-    navigator.clipboard.writeText(fillUrl).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    })
   }
 
   if (loading || !survey) {
@@ -196,25 +179,6 @@ export default function SettingsPage() {
           >
             取消
           </Link>
-        </div>
-        <hr className="border-gray-200" />
-        <div>
-          <label className={labelClass}>填写链接</label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              readOnly
-              value={fillUrl}
-              className={inputClass + ' flex-1 bg-gray-50'}
-            />
-            <button
-              type="button"
-              onClick={copyUrl}
-              className="px-5 py-2 rounded-lg font-semibold border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
-            >
-              {copied ? '已复制' : '复制链接'}
-            </button>
-          </div>
         </div>
       </div>
     </div>
