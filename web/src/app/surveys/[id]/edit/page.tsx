@@ -103,9 +103,11 @@ export default function EditSurveyPage() {
     if (!id) return
     setPublishing(true)
     surveysApi
-      .publish(id)
+      .updateBasic(id, { title, description })
+      .then(() => surveysApi.publish(id))
       .then(() => {
         if (survey) setSurvey({ ...survey, status: 'COLLECTING' })
+        alert('发布成功')
       })
       .catch((e) => alert(e?.response?.data?.message || '发布失败'))
       .finally(() => setPublishing(false))
