@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { Model } from 'survey-core'
+import { FlatLight } from 'survey-core/themes'
 import { Survey } from 'survey-react-ui'
 import { fillApi, type FillSurveyVO, type SurveyQuestionVO, type SubmitItemDTO } from '@/services/api'
 
@@ -170,6 +171,7 @@ export default function FillPage() {
     if (!meta) return null
     const json = metaToSurveyJson(meta)
     const model = new Model(json)
+    model.applyTheme(FlatLight)
     model.showNavigationButtons = false
     model.showCompletedPage = false
     return model
