@@ -3,19 +3,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from 'recharts'
+import ReactECharts from 'echarts-for-react'
+import type { EChartsOption } from 'echarts'
 import {
   surveysApi,
   type SurveyDetailVO,
@@ -111,7 +100,7 @@ export default function AnalyticsPage() {
           暂无数据
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {data.questions.map((q) => (
             <div key={q.questionId} className="bg-white rounded-lg shadow-card p-6">
               <SummaryBlock
@@ -140,12 +129,50 @@ function SummaryBlock({
 
   if (question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE') {
     const opts = Array.isArray(s) ? (s as AnalyticsOptionSummary[]) : []
-    const chartData = opts.map((o) => ({
-      name: o.label,
-      value: o.count,
-      ratio: o.ratio,
-    }))
     const total = opts.reduce((sum, o) => sum + o.count, 0)
+    const barOption: EChartsOption = {
+      grid: { left: '15%', right: '15%', top: 10, bottom: 30, containLabel: false },
+      xAxis: { type: 'value', splitLine: { lineStyle: { color: '#f0f0f0' } } },
+      yAxis: { type: 'category', data: opts.map((o) => o.label), axisLabel: { fontSize: 11 } },
+      series: [
+        {
+          type: 'bar',
+          data: opts.map((o) => o.count),
+          itemStyle: { color: CHART_COLORS[0], borderRadius: [0, 4, 4, 0] },
+          barWidth: '60%',
+        },
+      ],
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    }
+    const pieOption: EChartsOption = {
+      tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+      legend: {
+        orient: 'horizontal',
+        bottom: 0,
+        left: 'center',
+        textStyle: { fontSize: 11 },
+        formatter: (name: string) => {
+          const o = opts.find((x) => x.label === name)
+          if (!o) return name
+          const pct = total ? ((o.count / total) * 100).toFixed(1) : '0'
+          return `${name} ${o.count} (${pct}%)`
+        },
+      },
+      series: [
+        {
+          type: 'pie',
+          radius: '55%',
+          center: ['50%', '45%'],
+          data: opts.map((o, i) => ({
+            name: o.label,
+            value: o.count,
+            itemStyle: { color: CHART_COLORS[i % CHART_COLORS.length] },
+          })),
+          label: { show: false },
+          labelLine: { show: false },
+        },
+      ],
+    }
 
     return (
       <div className="space-y-4">
@@ -175,37 +202,11 @@ function SummaryBlock({
             饼图
           </button>
         </div>
-        <div className="h-80">
+        <div className="h-80 w-full">
           {chartType === 'pie' ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={chartData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100}
-                  label={({ name, value }) => `${name} ${value} (${total ? ((value / total) * 100).toFixed(1) : 0}%)`}
-                >
-                  {chartData.map((_, i) => (
-                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value: number | undefined) => [value ?? 0, '人数']} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+            <ReactECharts option={pieOption} style={{ height: '100%', width: '100%' }} />
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 30, left: 80, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis type="number" allowDecimals={false} />
-                <YAxis type="category" dataKey="name" width={70} tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Bar dataKey="value" name="人数" fill={CHART_COLORS[0]} radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <ReactECharts option={barOption} style={{ height: '100%', width: '100%' }} />
           )}
         </div>
         <table className="min-w-full text-sm border-collapse">
@@ -234,22 +235,35 @@ function SummaryBlock({
     const scale = s as AnalyticsScaleSummary
     const dist = scale?.distribution ?? []
     const barData = dist.map((d) => ({ name: String(d.value), count: d.count }))
+    const scaleOption: EChartsOption = {
+      grid: { left: '10%', right: '10%', top: 10, bottom: 30 },
+      xAxis: {
+        type: 'category',
+        data: barData.map((d) => d.name),
+        axisLabel: { fontSize: 11 },
+      },
+      yAxis: {
+        type: 'value',
+        splitLine: { lineStyle: { color: '#f0f0f0' } },
+      },
+      series: [
+        {
+          type: 'bar',
+          data: barData.map((d) => d.count),
+          itemStyle: { color: CHART_COLORS[0], borderRadius: [4, 4, 0, 0] },
+          barWidth: '60%',
+        },
+      ],
+      tooltip: { trigger: 'axis' },
+    }
 
     return (
       <div className="space-y-4">
         <h3 className="font-medium text-gray-800">{question.title}</h3>
         <p className="text-sm text-gray-600">平均分：{(scale?.avg ?? 0).toFixed(2)}</p>
         {barData.length > 0 && (
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={barData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="name" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="count" name="人数" fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="h-64 w-full">
+            <ReactECharts option={scaleOption} style={{ height: '100%', width: '100%' }} />
           </div>
         )}
         {dist.length > 0 && (
