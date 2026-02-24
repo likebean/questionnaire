@@ -1,0 +1,68 @@
+/* 填报页：标题/题目/提交按钮同一张卡、同一内容宽度，视觉一体不割裂 */
+
+/* 1. 标题区与正文、提交区同一水平内边距，绿线与内容同宽 */
+.fill-page-card .sd-title.sd-container-modern__title {
+  padding-left: var(--sd-base-padding, calc(5 * 8px));
+  padding-right: var(--sd-base-padding, calc(5 * 8px));
+  padding-top: var(--sd-page-vertical-padding, calc(3 * 8px));
+  padding-bottom: var(--sd-page-vertical-padding, calc(3 * 8px));
+}
+
+/* 2. 题目块不单独成卡：去掉阴影、与卡片同背景，题目之间无分割线 */
+.fill-page-card .sd-element--with-frame {
+  box-shadow: none;
+  background: var(--sjs-general-backcolor, #fff);
+  border-radius: 0;
+  margin-bottom: 0;
+}
+/* 题目之间间距略收紧 */
+.fill-page-card .sd-page__title ~ .sd-row.sd-page__row,
+.fill-page-card .sd-page__description ~ .sd-row.sd-page__row {
+  margin-top: calc(2 * (var(--sjs-base-unit, 8px)));
+}
+.fill-page-card .sd-row.sd-page__row ~ .sd-row.sd-page__row {
+  margin-top: 0;
+}
+
+/* 3. 提交区与正文同内边距，与题目区域无分割线 */
+.fill-page-card .fill-page-footer {
+  padding: calc(3 * (var(--sjs-base-unit, 8px))) calc(5 * (var(--sjs-base-unit, 8px)));
+  background: var(--sjs-general-backcolor, #fff);
+}
+
+/* 提交按钮主色 */
+.fill-page-surveyjs .sd-btn.sd-btn--action {
+  background-color: var(--sjs-primary-backcolor, #19b394) !important;
+  color: var(--sjs-primary-forecolor, #fff) !important;
+}
+.fill-page-surveyjs .sd-btn.sd-btn--action:hover:not(:disabled) {
+  background-color: var(--sjs-primary-backcolor-dark, rgb(20, 164, 139)) !important;
+  color: var(--sjs-primary-forecolor, #fff) !important;
+}
+
+/* 输入框边框更清晰 */
+.fill-page-surveyjs .sd-root-modern .sd-input {
+  box-shadow: inset 0 1px 2px 0 rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+.fill-page-surveyjs .sd-root-modern .sd-input:focus {
+  box-shadow: inset 0 1px 2px 0 rgba(0, 0, 0, 0.06), 0 0 0 2px var(--sjs-primary-backcolor, #19b394);
+}
+
+.fill-page-card .sd-body,
+.fill-page-card .sv_custom_header,
+.fill-page-card .sd-container-modern {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* 标题、题目区域、提交区背景统一为同一色（与卡片一致） */
+.fill-page-card .sd-root-modern,
+.fill-page-card .sd-body,
+.fill-page-card form,
+.fill-page-card .sd-container-modern,
+.fill-page-card .sd-title.sd-container-modern__title,
+.fill-page-card .sd-panel__content,
+.fill-page-card .sd-element--with-frame,
+.fill-page-card .fill-page-footer {
+  background-color: #fff !important;
+}

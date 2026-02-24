@@ -1,11 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
+import { Model } from 'survey-core'
+import { Survey } from 'survey-react-ui'
 import { fillApi, type FillSurveyVO, type SurveyQuestionVO, type SubmitItemDTO } from '@/services/api'
-
-const inputClass =
-  'block w-full rounded-md border border-gray-300 bg-white text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-2 pl-3'
 
 function parseConfig(c: string | null | undefined): Record<string, unknown> {
   if (!c) return {}
@@ -16,17 +15,136 @@ function parseConfig(c: string | null | undefined): Record<string, unknown> {
   }
 }
 
+function metaToSurveyJson(meta: FillSurveyVO): Record<string, unknown> {
+  const elements = (meta.questions ?? []).map((q) => questionToElement(q))
+  return {
+    title: meta.title,
+    description: meta.description ?? '',
+    showQuestionNumbers: 'on',
+    elements,
+  }
+}
+
+function questionToElement(q: SurveyQuestionVO): Record<string, unknown> {
+  const config = parseConfig(q.config)
+  const name = String(q.id!)
+  const base: Record<string, unknown> = {
+    name,
+    title: q.title || '题目',
+    isRequired: q.required !== false,
+  }
+  const opts = (config.options as { label?: string }[]) ?? []
+  const hasOther = config.hasOtherOption === true
+  const otherAllowFill = config.otherAllowFill === true
+
+  switch (q.type) {
+    case 'SINGLE_CHOICE': {
+      const choices: { value: number | string; text: string }[] = opts.map((o, i) => ({ value: i, text: o?.label ?? `选项${i + 1}` }))
+      if (hasOther) choices.push({ value: 'other', text: '其他' })
+      return {
+        ...base,
+        type: 'radiogroup',
+        choices,
+        showOtherItem: hasOther,
+        otherText: '其他',
+        showCommentArea: hasOther && otherAllowFill,
+      }
+    }
+    case 'MULTIPLE_CHOICE': {
+      const choices: { value: number | string; text: string }[] = opts.map((o, i) => ({ value: i, text: o?.label ?? `选项${i + 1}` }))
+      if (hasOther) choices.push({ value: 'other', text: '其他' })
+      return {
+        ...base,
+        type: 'checkbox',
+        choices,
+        showOtherItem: hasOther,
+        otherText: '其他',
+      }
+    }
+    case 'SHORT_TEXT':
+      return {
+        ...base,
+        type: 'text',
+        placeholder: (config.placeholder as string) ?? '',
+      }
+    case 'LONG_TEXT':
+      return {
+        ...base,
+        type: 'comment',
+        placeholder: (config.placeholder as string) ?? '',
+        rows: 3,
+      }
+    case 'SCALE': {
+      const min = (config.scaleMin as number) ?? 1
+      const max = (config.scaleMax as number) ?? 5
+      return {
+        ...base,
+        type: 'rating',
+        rateMin: min,
+        rateMax: max,
+        minRateDescription: (config.scaleLeftLabel as string) ?? '',
+        maxRateDescription: (config.scaleRightLabel as string) ?? '',
+        displayMode: 'buttons',
+      }
+    }
+    default:
+      return { ...base, type: 'text' }
+  }
+}
+
+function surveyDataToItems(
+  data: Record<string, unknown>,
+  questions: SurveyQuestionVO[]
+): SubmitItemDTO[] {
+  const items: SubmitItemDTO[] = []
+  for (const q of questions) {
+    const name = String(q.id!)
+    const value = data[name]
+    if (value === undefined || value === null) continue
+    const config = parseConfig(q.config)
+    const opts = (config.options as unknown[]) ?? []
+    const otherIndex = opts.length
+    const hasOther = config.hasOtherOption === true
+
+    if (q.type === 'SINGLE_CHOICE') {
+      if (value === 'other') {
+        const textValue = (data[`${name}-Comment`] as string) ?? ''
+        items.push({ questionId: q.id!, optionIndex: otherIndex, textValue })
+      } else if (typeof value === 'number') {
+        items.push({ questionId: q.id!, optionIndex: value })
+      }
+    } else if (q.type === 'MULTIPLE_CHOICE') {
+      const arr = Array.isArray(value) ? value : [value]
+      const optionIndices = arr.filter((v): v is number => typeof v === 'number').sort((a, b) => a - b)
+      const hasOtherSel = arr.includes('other')
+      if (hasOtherSel) optionIndices.push(otherIndex)
+      optionIndices.sort((a, b) => a - b)
+      const textValue = hasOtherSel ? ((data[`${name}-Comment`] as string) ?? '') : undefined
+      if (optionIndices.length) items.push({ questionId: q.id!, optionIndices, ...(textValue !== undefined && { textValue }) })
+    } else if (q.type === 'SHORT_TEXT' || q.type === 'LONG_TEXT' || q.type === 'text' || q.type === 'comment') {
+      const textValue = typeof value === 'string' ? value : String(value ?? '')
+      if (textValue !== '') items.push({ questionId: q.id!, textValue })
+    } else if (q.type === 'SCALE' || q.type === 'rating') {
+      const n = Number(value)
+      if (!Number.isNaN(n)) items.push({ questionId: q.id!, scaleValue: n })
+    } else {
+      const textValue = typeof value === 'string' ? value : String(value ?? '')
+      if (textValue !== '') items.push({ questionId: q.id!, textValue })
+    }
+  }
+  return items
+}
+
 export default function FillPage() {
   const params = useParams()
   const id = Number(params.id)
   const [meta, setMeta] = useState<FillSurveyVO | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<{ code: number; message: string } | null>(null)
-  const [answers, setAnswers] = useState<Record<number, SubmitItemDTO>>({})
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
-  const [thankYou, setThankYou] = useState('')
-  const startTime = useState(Date.now())[0]
+  const [thankYou, setThankYou] = useState('感谢您的填写！')
+  const startTime = useMemo(() => Date.now(), [])
 
   useEffect(() => {
     if (!id) return
@@ -48,68 +166,32 @@ export default function FillPage() {
       .finally(() => setLoading(false))
   }, [id])
 
-  const setAnswer = (questionId: number, item: Partial<SubmitItemDTO>) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]: { ...prev[questionId], questionId, ...item },
-    }))
-  }
+  const surveyModel = useMemo(() => {
+    if (!meta) return null
+    const json = metaToSurveyJson(meta)
+    const model = new Model(json)
+    model.showNavigationButtons = false
+    model.showCompletedPage = false
+    return model
+  }, [meta])
 
-  const validate = (): boolean => {
-    if (!meta?.questions) return true
-    for (const q of meta.questions) {
-      if (q.required !== false) {
-        const a = answers[q.id!]
-        const config = parseConfig(q.config)
-        const opts = (config.options as unknown[]) ?? []
-        const otherIdx = opts.length
-        const otherAllowFill = config.otherAllowFill === true
-        if (q.type === 'SINGLE_CHOICE' && a?.optionIndex === otherIdx && otherAllowFill) {
-          if (!a.textValue || !a.textValue.trim()) {
-            alert(`请完成必填题：${q.title || '题目'}（请填写「其他」）`)
-            return false
-          }
-        }
-        if (q.type === 'MULTIPLE_CHOICE' && otherAllowFill && a?.optionIndices?.includes(otherIdx)) {
-          if (!a.textValue || !a.textValue.trim()) {
-            alert(`请完成必填题：${q.title || '题目'}（请填写「其他」）`)
-            return false
-          }
-        }
-        const has =
-          (a?.optionIndex != null) ||
-          (a?.optionIndices?.length) ||
-          (a?.textValue != null && a.textValue.trim() !== '') ||
-          (a?.scaleValue != null)
-        if (!has) {
-          alert(`请完成必填题：${q.title || '题目'}`)
-          return false
-        }
-      }
+  const handleSubmit = () => {
+    if (!surveyModel || !meta) return
+    surveyModel.validate()
+    if (!surveyModel.hasErrors()) {
+      setSubmitting(true)
+      const data = surveyModel.data
+      const items = surveyDataToItems(data, meta.questions ?? [])
+      const durationSeconds = Math.round((Date.now() - startTime) / 1000)
+      fillApi
+        .submit(id, { items, durationSeconds })
+        .then(() => setSubmitted(true))
+        .catch((err) => {
+          const d = err?.response?.data
+          alert(d?.message ?? '提交失败')
+        })
+        .finally(() => setSubmitting(false))
     }
-    return true
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!meta || !validate()) return
-    setSubmitting(true)
-    const items = Object.values(answers).filter(
-      (a) =>
-        a.optionIndex != null ||
-        (a.optionIndices && a.optionIndices.length > 0) ||
-        (a.textValue != null && a.textValue !== '') ||
-        a.scaleValue != null
-    )
-    const durationSeconds = Math.round((Date.now() - startTime) / 1000)
-    fillApi
-      .submit(id, { items, durationSeconds })
-      .then(() => setSubmitted(true))
-      .catch((err) => {
-        const d = err?.response?.data
-        alert(d?.message ?? '提交失败')
-      })
-      .finally(() => setSubmitting(false))
   }
 
   if (loading) return <div className="max-w-2xl mx-auto p-6">加载中...</div>
@@ -132,200 +214,27 @@ export default function FillPage() {
       </div>
     )
   }
-  if (!meta) return null
+  if (!meta || !surveyModel) return null
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
-      <div className="bg-white rounded-lg shadow-card p-6 mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">{meta.title}</h1>
-        {meta.description && <p className="text-gray-600 whitespace-pre-wrap">{meta.description}</p>}
-      </div>
-      <form onSubmit={handleSubmit}>
-        <div className="space-y-6">
-          {meta.questions?.map((q, i) => (
-            <div key={q.id} className="bg-white rounded-lg shadow-card p-6">
-              <div className="font-medium text-gray-800 mb-2">
-                {i + 1}. {q.title}
-                {q.required !== false && <span className="text-red-500"> *</span>}
-              </div>
-              <FillControl question={q} answer={answers[q.id!]} setAnswer={(a) => setAnswer(q.id!, a)} />
-            </div>
-          ))}
-        </div>
-        <div className="mt-6">
+    <div className="fill-page-wrapper py-8 px-4">
+      <div className="fill-page-surveyjs fill-page-card w-full max-w-2xl mx-auto bg-white rounded-xl shadow-card overflow-hidden">
+        <Survey
+          model={surveyModel}
+          id={`survey-${id}`}
+        />
+        <div className="fill-page-footer">
           <button
-            type="submit"
+            type="button"
+            onClick={handleSubmit}
             disabled={submitting}
-            className="w-full py-3 rounded-lg font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 shadow-sm"
+            className="sd-btn sd-btn--action"
+            style={{ width: '100%', padding: '12px 16px', fontSize: '1rem', fontWeight: 600 }}
           >
             {submitting ? '提交中...' : '提交'}
           </button>
         </div>
-      </form>
+      </div>
     </div>
   )
-}
-
-function FillControl({
-  question,
-  answer,
-  setAnswer,
-}: {
-  question: SurveyQuestionVO
-  answer?: SubmitItemDTO
-  setAnswer: (a: Partial<SubmitItemDTO>) => void
-}) {
-  const config = parseConfig(question.config)
-  const options = (config.options as { label?: string }[]) ?? []
-  const hasOtherOption = config.hasOtherOption === true
-  const otherAllowFill = config.otherAllowFill === true
-  const otherIndex = options.length
-
-  switch (question.type) {
-    case 'SINGLE_CHOICE': {
-      const selectedIdx = answer?.optionIndex ?? -1
-      const showOtherFill = hasOtherOption && otherAllowFill && selectedIdx === otherIndex
-      return (
-        <div className="space-y-2">
-          {options.map((opt, i) => (
-            <label key={i} className="flex items-center gap-2">
-              <input
-                type="radio"
-                name={`q-${question.id}`}
-                checked={selectedIdx === i}
-                onChange={() => setAnswer({ optionIndex: i, textValue: '' })}
-              />
-              {opt.label ?? `选项${i + 1}`}
-            </label>
-          ))}
-          {hasOtherOption && (
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name={`q-${question.id}`}
-                checked={selectedIdx === otherIndex}
-                onChange={() => setAnswer({ optionIndex: otherIndex, textValue: '' })}
-              />
-              其他
-            </label>
-          )}
-          {showOtherFill && (
-            <div className="ml-6 mt-2">
-              <input
-                type="text"
-                value={answer?.textValue ?? ''}
-                onChange={(e) => setAnswer({ textValue: e.target.value })}
-                placeholder="请输入"
-                className={inputClass}
-              />
-            </div>
-          )}
-        </div>
-      )
-    }
-    case 'MULTIPLE_CHOICE': {
-      const indices = answer?.optionIndices ?? []
-      const showOtherFill = hasOtherOption && otherAllowFill && indices.includes(otherIndex)
-      return (
-        <div className="space-y-2">
-          {options.map((opt, i) => (
-            <label key={i} className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={indices.includes(i)}
-                onChange={(e) => {
-                  const next = e.target.checked
-                    ? [...indices, i].sort((a, b) => a - b)
-                    : indices.filter((x) => x !== i)
-                  setAnswer({ optionIndices: next })
-                }}
-              />
-              {opt.label ?? `选项${i + 1}`}
-            </label>
-          ))}
-          {hasOtherOption && (
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={indices.includes(otherIndex)}
-                onChange={(e) => {
-                  const next = e.target.checked
-                    ? [...indices, otherIndex].sort((a, b) => a - b)
-                    : indices.filter((x) => x !== otherIndex)
-                  setAnswer({ optionIndices: next })
-                }}
-              />
-              其他
-            </label>
-          )}
-          {showOtherFill && (
-            <div className="ml-6 mt-2">
-              <input
-                type="text"
-                value={answer?.textValue ?? ''}
-                onChange={(e) => setAnswer({ textValue: e.target.value })}
-                placeholder="请输入"
-                className={inputClass}
-              />
-            </div>
-          )}
-        </div>
-      )
-    }
-    case 'SHORT_TEXT':
-      return (
-        <input
-          type="text"
-          value={answer?.textValue ?? ''}
-          onChange={(e) => setAnswer({ textValue: e.target.value })}
-          placeholder={(config.placeholder as string) ?? ''}
-          className={inputClass}
-        />
-      )
-    case 'LONG_TEXT':
-      return (
-        <textarea
-          value={answer?.textValue ?? ''}
-          onChange={(e) => setAnswer({ textValue: e.target.value })}
-          placeholder={(config.placeholder as string) ?? ''}
-          className={inputClass}
-          rows={3}
-        />
-      )
-    case 'SCALE':
-      const min = (config.scaleMin as number) ?? 1
-      const max = (config.scaleMax as number) ?? 5
-      const left = (config.scaleLeftLabel as string) ?? ''
-      const right = (config.scaleRightLabel as string) ?? ''
-      return (
-        <div>
-          <div className="flex justify-between text-sm text-gray-500 mb-1">
-            <span>{left}</span>
-            <span>{right}</span>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            {Array.from({ length: max - min + 1 }, (_, i) => min + i).map((v) => (
-              <label key={v} className="flex items-center gap-1">
-                <input
-                  type="radio"
-                  name={`scale-${question.id}`}
-                  checked={answer?.scaleValue === v}
-                  onChange={() => setAnswer({ scaleValue: v })}
-                />
-                {v}
-              </label>
-            ))}
-          </div>
-        </div>
-      )
-    default:
-      return (
-        <input
-          type="text"
-          value={answer?.textValue ?? ''}
-          onChange={(e) => setAnswer({ textValue: e.target.value })}
-          className={inputClass}
-        />
-      )
-  }
 }

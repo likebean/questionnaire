@@ -14,8 +14,16 @@ body {
   color: rgb(15 23 42);
 }
 
-/* 与 ai-plugin 对齐：圆角、表格、状态标签 */
-button, .btn, input, select, textarea, .rounded, .rounded-md, .rounded-lg, .rounded-xl {
+/* 与 ai-plugin 对齐：圆角、表格、状态标签（排除 SurveyJS 填报页，让其使用自带样式） */
+button:not(.surveyjs-root *):not(.sd-root-modern *),
+.btn:not(.surveyjs-root *):not(.sd-root-modern *),
+input:not(.surveyjs-root *):not(.sd-root-modern *),
+select:not(.surveyjs-root *):not(.sd-root-modern *),
+textarea:not(.surveyjs-root *):not(.sd-root-modern *),
+.rounded:not(.surveyjs-root *):not(.sd-root-modern *),
+.rounded-md:not(.surveyjs-root *):not(.sd-root-modern *),
+.rounded-lg:not(.surveyjs-root *):not(.sd-root-modern *),
+.rounded-xl:not(.surveyjs-root *):not(.sd-root-modern *) {
   border-radius: 0.75rem;
 }
 .table-modern th {

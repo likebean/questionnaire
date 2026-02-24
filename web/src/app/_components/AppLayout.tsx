@@ -12,15 +12,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const isLoginPage = pathname?.startsWith('/auth/login') ?? false
+  const isFillPage = pathname?.startsWith('/fill/') ?? false
 
   useEffect(() => {
     if (loading) return
-    if (!isLoginPage && !user) {
+    if (isLoginPage || isFillPage) return
+    if (!user) {
       router.replace('/auth/login')
     }
-  }, [loading, user, isLoginPage, router])
+  }, [loading, user, isLoginPage, isFillPage, router])
 
-  if (isLoginPage) {
+  if (isLoginPage || isFillPage) {
     return <>{children}</>
   }
 
