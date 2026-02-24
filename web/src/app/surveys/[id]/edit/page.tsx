@@ -1,8 +1,24 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import {
   surveysApi,
   type SurveyDetailVO,
@@ -52,6 +68,115 @@ function getInt(config: Record<string, unknown>, key: string, def: number): numb
   const v = config[key]
   if (typeof v === 'number') return v
   return def
+}
+
+function SortableQuestionRow({
+  question,
+  index,
+  isSelected,
+  onSelect,
+}: {
+  question: SurveyQuestionVO
+  index: number
+  isSelected: boolean
+  onSelect: () => void
+}) {
+  const id = `q-${question.id}`
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={
+        'flex items-center gap-1 rounded-lg mb-1 ' +
+        (isSelected ? 'bg-blue-50' : '') +
+        (isDragging ? ' opacity-50 z-10' : '')
+      }
+    >
+      <button
+        type="button"
+        className="p-1.5 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing touch-none"
+        title="拖拽排序"
+        {...attributes}
+        {...listeners}
+      >
+        <i className="fas fa-grip-vertical text-xs" />
+      </button>
+      <button
+        type="button"
+        onClick={onSelect}
+        className={
+          'flex-1 text-left px-2 py-2 text-sm truncate min-w-0 ' +
+          (isSelected ? 'text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-50')
+        }
+      >
+        {index + 1}. {(question.title || '').slice(0, 10)}
+        {(question.title || '').length > 10 ? '…' : ''}
+      </button>
+    </div>
+  )
+}
+
+function SortableOptionRow({
+  index,
+  opt,
+  onLabelChange,
+  onRemove,
+  inputClass,
+}: {
+  index: number
+  opt: OptionItem
+  onLabelChange: (label: string) => void
+  onRemove: () => void
+  inputClass: string
+}) {
+  const id = `opt-${index}`
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  const style = { transform: CSS.Transform.toString(transform), transition }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={'mb-2 flex flex-wrap items-center gap-2' + (isDragging ? ' opacity-50' : '')}
+    >
+      <button
+        type="button"
+        className="p-1.5 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing touch-none shrink-0"
+        title="拖拽排序"
+        {...attributes}
+        {...listeners}
+      >
+        <i className="fas fa-grip-vertical text-xs" />
+      </button>
+      <input
+        type="text"
+        value={opt.label}
+        onChange={(e) => onLabelChange(e.target.value)}
+        className={inputClass + ' flex-1 min-w-0'}
+      />
+      <button
+        type="button"
+        onClick={onRemove}
+        className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm shrink-0"
+      >
+        删除
+      </button>
+    </div>
+  )
 }
 
 export default function EditSurveyPage() {
@@ -149,21 +274,30 @@ export default function EditSurveyPage() {
     })
   }
 
-  const handleMoveQuestion = (qId: number, direction: 'up' | 'down') => {
-    if (!id || !survey?.questions?.length) return
+  const handleQuestionDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!id || !survey?.questions?.length || !over || active.id === over.id) return
     const ids = survey.questions.map((q) => q.id!).filter(Boolean)
-    const idx = ids.indexOf(qId)
-    if (idx < 0) return
-    if (direction === 'up' && idx === 0) return
-    if (direction === 'down' && idx === ids.length - 1) return
-    const next = [...ids]
-    const swap = direction === 'up' ? idx - 1 : idx + 1
-    ;[next[idx], next[swap]] = [next[swap], next[idx]]
+    const oldIndex = ids.indexOf(Number(String(active.id).replace(/^q-/, '')))
+    const newIndex = ids.indexOf(Number(String(over.id).replace(/^q-/, '')))
+    if (oldIndex < 0 || newIndex < 0) return
+    const needConfirm = survey.status === 'COLLECTING' || survey.status === 'PAUSED'
+    if (needConfirm && !window.confirm('调整题目顺序会影响已回收数据与统计，是否继续？')) return
+    const next = arrayMove(ids, oldIndex, newIndex)
     surveysApi.updateQuestionOrder(id, next).then(() => {
-      const reordered = next.map((id) => survey.questions!.find((q) => q.id === id)!).filter(Boolean)
+      const reordered = next.map((oid) => survey.questions!.find((q) => q.id === oid)!).filter(Boolean)
       setSurvey({ ...survey, questions: reordered })
     })
   }
+
+  const questionSortableIds = useMemo(
+    () => (survey?.questions ?? []).map((q) => `q-${q.id}`),
+    [survey?.questions]
+  )
+  const questionSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor)
+  )
 
   const handleCopyQuestion = (qId: number) => {
     if (!id || !survey) return
@@ -230,46 +364,24 @@ export default function EditSurveyPage() {
       </div>
       <div className="flex gap-6">
         <div className="w-64 bg-white rounded-lg shadow-card p-4">
-          <div className="text-sm font-medium text-gray-700 mb-3">题目列表</div>
-          {survey.questions?.map((q, i) => (
-            <div
-              key={q.id}
-              className={
-                'flex items-center gap-1 rounded-lg mb-1 ' +
-                (selectedId === q.id ? 'bg-blue-50' : '')
-              }
-            >
-              <button
-                type="button"
-                onClick={() => setSelectedId(q.id ?? null)}
-                className={
-                  'flex-1 text-left px-3 py-2 text-sm truncate ' +
-                  (selectedId === q.id ? 'text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-50')
-                }
-              >
-                {i + 1}. {(q.title || '').slice(0, 10)}
-                {(q.title || '').length > 10 ? '…' : ''}
-              </button>
-              <button
-                type="button"
-                title="上移"
-                disabled={i === 0}
-                onClick={(e) => { e.stopPropagation(); handleMoveQuestion(q.id!, 'up') }}
-                className="p-1 text-gray-500 hover:text-gray-700 disabled:opacity-30"
-              >
-                <i className="fas fa-chevron-up text-xs" />
-              </button>
-              <button
-                type="button"
-                title="下移"
-                disabled={i === survey.questions!.length - 1}
-                onClick={(e) => { e.stopPropagation(); handleMoveQuestion(q.id!, 'down') }}
-                className="p-1 text-gray-500 hover:text-gray-700 disabled:opacity-30"
-              >
-                <i className="fas fa-chevron-down text-xs" />
-              </button>
-            </div>
-          ))}
+          <div className="text-sm font-medium text-gray-700 mb-3">题目列表（拖拽排序）</div>
+          <DndContext
+            sensors={questionSensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleQuestionDragEnd}
+          >
+            <SortableContext items={questionSortableIds} strategy={verticalListSortingStrategy}>
+              {survey.questions?.map((q, i) => (
+                <SortableQuestionRow
+                  key={q.id}
+                  question={q}
+                  index={i}
+                  isSelected={selectedId === q.id}
+                  onSelect={() => setSelectedId(q.id ?? null)}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
           <button
             type="button"
             onClick={handleAddQuestion}
@@ -368,28 +480,39 @@ function QuestionEditor({
       </div>
       {(question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE') && (
         <div className="mb-4">
-          <label className={labelClass}>选项</label>
-          {options.map((opt, i) => (
-            <div key={i} className="mb-2 flex flex-wrap items-center gap-2">
-              <input
-                type="text"
-                value={opt.label}
-                onChange={(e) => {
-                  const next = options.slice()
-                  next[i] = { ...next[i], label: e.target.value }
-                  setOptions(next)
-                }}
-                className={inputClass + ' flex-1 min-w-0'}
-              />
-              <button
-                type="button"
-                onClick={() => setOptions(options.filter((_, j) => j !== i))}
-                className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm"
-              >
-                删除
-              </button>
-            </div>
-          ))}
+          <label className={labelClass}>选项（拖拽排序）</label>
+          <DndContext
+            sensors={useSensors(
+              useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+              useSensor(KeyboardSensor)
+            )}
+            collisionDetection={closestCenter}
+            onDragEnd={(event: DragEndEvent) => {
+              const { active, over } = event
+              if (!over || active.id === over.id) return
+              const oldI = Number(String(active.id).replace(/^opt-/, ''))
+              const newI = Number(String(over.id).replace(/^opt-/, ''))
+              if (Number.isNaN(oldI) || Number.isNaN(newI)) return
+              setOptions(arrayMove(options, oldI, newI))
+            }}
+          >
+            <SortableContext items={options.map((_, i) => `opt-${i}`)} strategy={verticalListSortingStrategy}>
+              {options.map((opt, i) => (
+                <SortableOptionRow
+                  key={i}
+                  index={i}
+                  opt={opt}
+                  onLabelChange={(label) => {
+                    const next = options.slice()
+                    next[i] = { ...next[i], label }
+                    setOptions(next)
+                  }}
+                  onRemove={() => setOptions(options.filter((_, j) => j !== i))}
+                  inputClass={inputClass}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
           <button
             type="button"
             onClick={() => setOptions([...options, { sortOrder: options.length, label: `选项${options.length + 1}` }])}
