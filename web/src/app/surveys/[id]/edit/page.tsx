@@ -31,12 +31,15 @@ function parseConfig(c: string | null | undefined): Record<string, unknown> {
   }
 }
 
-function getOptions(config: Record<string, unknown>): { sortOrder: number; label: string }[] {
+type OptionItem = { sortOrder: number; label: string; isOther?: boolean; allowFill?: boolean }
+function getOptions(config: Record<string, unknown>): OptionItem[] {
   const o = config.options
-  if (!Array.isArray(o)) return [{ sortOrder: 0, label: '选项1' }]
-  return o.map((x: { sortOrder?: number; label?: string }, i: number) => ({
+  if (!Array.isArray(o)) return [{ sortOrder: 0, label: '选项1', isOther: false, allowFill: false }]
+  return o.map((x: { sortOrder?: number; label?: string; isOther?: boolean; allowFill?: boolean }, i: number) => ({
     sortOrder: x.sortOrder ?? i,
     label: x.label ?? `选项${i + 1}`,
+    isOther: x.isOther === true,
+    allowFill: x.allowFill === true,
   }))
 }
 
@@ -156,6 +159,38 @@ export default function EditSurveyPage() {
     })
   }
 
+  const handleMoveQuestion = (qId: number, direction: 'up' | 'down') => {
+    if (!id || !survey?.questions?.length) return
+    const ids = survey.questions.map((q) => q.id!).filter(Boolean)
+    const idx = ids.indexOf(qId)
+    if (idx < 0) return
+    if (direction === 'up' && idx === 0) return
+    if (direction === 'down' && idx === ids.length - 1) return
+    const next = [...ids]
+    const swap = direction === 'up' ? idx - 1 : idx + 1
+    ;[next[idx], next[swap]] = [next[swap], next[idx]]
+    surveysApi.updateQuestionOrder(id, next).then(() => {
+      const reordered = next.map((id) => survey.questions!.find((q) => q.id === id)!).filter(Boolean)
+      setSurvey({ ...survey, questions: reordered })
+    })
+  }
+
+  const handleCopyQuestion = (qId: number) => {
+    if (!id || !survey) return
+    const needConfirm = survey.status === 'COLLECTING' || survey.status === 'PAUSED'
+    if (needConfirm && !window.confirm('修改题目会影响已回收数据与统计，是否继续？')) return
+    surveysApi.copyQuestion(id, qId).then((res) => {
+      if (res?.data?.id) {
+        surveysApi.getDetail(id).then((detailRes) => {
+          if (detailRes?.data) {
+            setSurvey(detailRes.data)
+            setSelectedId(res.data!.id!)
+          }
+        })
+      }
+    })
+  }
+
   if (loading || !survey) {
     return (
       <div className="p-0">
@@ -219,21 +254,46 @@ export default function EditSurveyPage() {
         </div>
       </div>
       <div className="flex gap-6">
-        <div className="w-56 bg-white rounded-lg shadow-card p-4">
+        <div className="w-64 bg-white rounded-lg shadow-card p-4">
           <div className="text-sm font-medium text-gray-700 mb-3">题目列表</div>
           {survey.questions?.map((q, i) => (
-            <button
+            <div
               key={q.id}
-              type="button"
-              onClick={() => setSelectedId(q.id ?? null)}
               className={
-                'w-full text-left px-3 py-2 rounded-lg mb-1 text-sm ' +
-                (selectedId === q.id ? 'bg-blue-50 text-blue-700 font-medium' : 'hover:bg-gray-50 text-gray-700')
+                'flex items-center gap-1 rounded-lg mb-1 ' +
+                (selectedId === q.id ? 'bg-blue-50' : '')
               }
             >
-              {i + 1}. {(q.title || '').slice(0, 12)}
-              {(q.title || '').length > 12 ? '…' : ''}
-            </button>
+              <button
+                type="button"
+                onClick={() => setSelectedId(q.id ?? null)}
+                className={
+                  'flex-1 text-left px-3 py-2 text-sm truncate ' +
+                  (selectedId === q.id ? 'text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-50')
+                }
+              >
+                {i + 1}. {(q.title || '').slice(0, 10)}
+                {(q.title || '').length > 10 ? '…' : ''}
+              </button>
+              <button
+                type="button"
+                title="上移"
+                disabled={i === 0}
+                onClick={(e) => { e.stopPropagation(); handleMoveQuestion(q.id!, 'up') }}
+                className="p-1 text-gray-500 hover:text-gray-700 disabled:opacity-30"
+              >
+                <i className="fas fa-chevron-up text-xs" />
+              </button>
+              <button
+                type="button"
+                title="下移"
+                disabled={i === survey.questions!.length - 1}
+                onClick={(e) => { e.stopPropagation(); handleMoveQuestion(q.id!, 'down') }}
+                className="p-1 text-gray-500 hover:text-gray-700 disabled:opacity-30"
+              >
+                <i className="fas fa-chevron-down text-xs" />
+              </button>
+            </div>
           ))}
           <button
             type="button"
@@ -246,9 +306,11 @@ export default function EditSurveyPage() {
         <div className="flex-1 bg-white rounded-lg shadow-card p-6">
             {selected ? (
               <QuestionEditor
+                surveyId={id}
                 question={selected}
                 onUpdate={(patch) => handleUpdateQuestion(selected.id!, patch)}
                 onDelete={() => handleDeleteQuestion(selected.id!)}
+                onCopy={() => handleCopyQuestion(selected.id!)}
               />
             ) : (
               <p className="text-gray-500">请选择或添加题目</p>
@@ -260,13 +322,17 @@ export default function EditSurveyPage() {
 }
 
 function QuestionEditor({
+  surveyId,
   question,
   onUpdate,
   onDelete,
+  onCopy,
 }: {
+  surveyId: number
   question: SurveyQuestionVO
   onUpdate: (patch: Partial<SurveyQuestionVO>) => void
   onDelete: () => void
+  onCopy: () => void
 }) {
   const config = parseConfig(question.config)
   const options = getOptions(config)
@@ -276,7 +342,7 @@ function QuestionEditor({
     onUpdate({ config: JSON.stringify(next) })
   }
 
-  const setOptions = (opts: { sortOrder: number; label: string }[]) => {
+  const setOptions = (opts: OptionItem[]) => {
     setConfig('options', opts)
   }
 
@@ -329,7 +395,7 @@ function QuestionEditor({
         <div className="mb-4">
           <label className={labelClass}>选项</label>
           {options.map((opt, i) => (
-            <div key={i} className="flex gap-2 mb-2">
+            <div key={i} className="mb-2 flex flex-wrap items-center gap-2">
               <input
                 type="text"
                 value={opt.label}
@@ -338,8 +404,36 @@ function QuestionEditor({
                   next[i] = { ...next[i], label: e.target.value }
                   setOptions(next)
                 }}
-                className={inputClass + ' flex-1'}
+                className={inputClass + ' flex-1 min-w-0'}
               />
+              <label className="flex items-center gap-1 text-sm text-gray-600 whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  checked={opt.isOther === true}
+                  onChange={(e) => {
+                    const next = options.slice()
+                    next[i] = { ...next[i], isOther: e.target.checked, allowFill: e.target.checked ? next[i].allowFill : false }
+                    setOptions(next)
+                  }}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                其他
+              </label>
+              {opt.isOther && (
+                <label className="flex items-center gap-1 text-sm text-gray-600 whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={opt.allowFill === true}
+                    onChange={(e) => {
+                      const next = options.slice()
+                      next[i] = { ...next[i], allowFill: e.target.checked }
+                      setOptions(next)
+                    }}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  允许填空
+                </label>
+              )}
               <button
                 type="button"
                 onClick={() => setOptions(options.filter((_, j) => j !== i))}
@@ -351,7 +445,7 @@ function QuestionEditor({
           ))}
           <button
             type="button"
-            onClick={() => setOptions([...options, { sortOrder: options.length, label: `选项${options.length + 1}` }])}
+            onClick={() => setOptions([...options, { sortOrder: options.length, label: `选项${options.length + 1}`, isOther: false, allowFill: false }])}
             className="text-blue-600 hover:underline text-sm"
           >
             添加选项
@@ -434,13 +528,22 @@ function QuestionEditor({
           </div>
         </div>
       )}
-      <button
-        type="button"
-        onClick={onDelete}
-        className="mt-6 px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 text-sm"
-      >
-        删除此题
-      </button>
+      <div className="mt-6 flex gap-2">
+        <button
+          type="button"
+          onClick={onCopy}
+          className="px-4 py-2 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 text-sm"
+        >
+          <i className="fas fa-copy mr-1" /> 复制题目
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          className="px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 text-sm"
+        >
+          删除此题
+        </button>
+      </div>
     </div>
   )
 }

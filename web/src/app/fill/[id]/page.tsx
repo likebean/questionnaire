@@ -60,6 +60,21 @@ export default function FillPage() {
     for (const q of meta.questions) {
       if (q.required !== false) {
         const a = answers[q.id!]
+        const config = parseConfig(q.config)
+        const options = (config.options as { allowFill?: boolean }[]) ?? []
+        if (q.type === 'SINGLE_CHOICE' && a?.optionIndex != null && options[a.optionIndex]?.allowFill) {
+          if (!a.textValue || !a.textValue.trim()) {
+            alert(`请完成必填题：${q.title || '题目'}（请填写「其他」）`)
+            return false
+          }
+        }
+        if (q.type === 'MULTIPLE_CHOICE' && a?.optionIndices?.length) {
+          const needOther = a.optionIndices.some((i) => options[i]?.allowFill)
+          if (needOther && (!a.textValue || !a.textValue.trim())) {
+            alert(`请完成必填题：${q.title || '题目'}（请填写「其他」）`)
+            return false
+          }
+        }
         const has =
           (a?.optionIndex != null) ||
           (a?.optionIndices?.length) ||
@@ -160,10 +175,12 @@ function FillControl({
   setAnswer: (a: Partial<SubmitItemDTO>) => void
 }) {
   const config = parseConfig(question.config)
-  const options = (config.options as { label?: string }[]) ?? []
+  const options = (config.options as { label?: string; isOther?: boolean; allowFill?: boolean }[]) ?? []
 
   switch (question.type) {
-    case 'SINGLE_CHOICE':
+    case 'SINGLE_CHOICE': {
+      const selectedOpt = answer?.optionIndex != null ? options[answer.optionIndex] : null
+      const showOtherFill = selectedOpt?.isOther === true && selectedOpt?.allowFill === true
       return (
         <div className="space-y-2">
           {options.map((opt, i) => (
@@ -172,15 +189,29 @@ function FillControl({
                 type="radio"
                 name={`q-${question.id}`}
                 checked={answer?.optionIndex === i}
-                onChange={() => setAnswer({ optionIndex: i })}
+                onChange={() => setAnswer({ optionIndex: i, textValue: '' })}
               />
               {opt.label ?? `选项${i + 1}`}
             </label>
           ))}
+          {showOtherFill && (
+            <div className="ml-6 mt-2">
+              <input
+                type="text"
+                value={answer?.textValue ?? ''}
+                onChange={(e) => setAnswer({ textValue: e.target.value })}
+                placeholder="请输入"
+                className={inputClass}
+              />
+            </div>
+          )}
         </div>
       )
-    case 'MULTIPLE_CHOICE':
+    }
+    case 'MULTIPLE_CHOICE': {
       const indices = answer?.optionIndices ?? []
+      const selectedWithOther = indices.find((idx) => options[idx]?.isOther === true && options[idx]?.allowFill === true)
+      const showOtherFill = selectedWithOther !== undefined
       return (
         <div className="space-y-2">
           {options.map((opt, i) => (
@@ -198,8 +229,20 @@ function FillControl({
               {opt.label ?? `选项${i + 1}`}
             </label>
           ))}
+          {showOtherFill && (
+            <div className="ml-6 mt-2">
+              <input
+                type="text"
+                value={answer?.textValue ?? ''}
+                onChange={(e) => setAnswer({ textValue: e.target.value })}
+                placeholder="请输入"
+                className={inputClass}
+              />
+            </div>
+          )}
         </div>
       )
+    }
     case 'SHORT_TEXT':
       return (
         <input

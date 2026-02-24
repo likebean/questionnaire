@@ -249,6 +249,7 @@ export default function MySurveysPage() {
                             </Link>
                           </>
                         )}
+                        <SurveyStatusActions item={item} onDone={load} />
                         <CopyFillLinkButton surveyId={item.id} />
                         <CopySurveyButton surveyId={item.id} router={router} onDone={load} />
                         <button
@@ -333,6 +334,78 @@ export default function MySurveysPage() {
       )}
     </div>
   )
+}
+
+function SurveyStatusActions({
+  item,
+  onDone,
+}: {
+  item: SurveyListItemVO
+  onDone: () => void
+}) {
+  const [loading, setLoading] = useState(false)
+  const onAction = (fn: () => Promise<unknown>) => {
+    setLoading(true)
+    fn()
+      .then(onDone)
+      .catch((e) => alert(e?.response?.data?.message ?? '操作失败'))
+      .finally(() => setLoading(false))
+  }
+  if (item.status === 'COLLECTING') {
+    return (
+      <>
+        <button
+          type="button"
+          title="暂停回收"
+          disabled={loading}
+          onClick={() => onAction(() => surveysApi.pause(item.id))}
+          className="text-gray-600 hover:text-gray-900 disabled:opacity-50"
+        >
+          <i className="fas fa-pause" />
+        </button>
+        <button
+          type="button"
+          title="结束问卷"
+          disabled={loading}
+          onClick={() => {
+            if (!window.confirm('结束后将无法再接收新答卷，确定结束问卷吗？')) return
+            onAction(() => surveysApi.end(item.id))
+          }}
+          className="text-gray-600 hover:text-gray-900 disabled:opacity-50"
+        >
+          <i className="fas fa-stop" />
+        </button>
+      </>
+    )
+  }
+  if (item.status === 'PAUSED') {
+    return (
+      <>
+        <button
+          type="button"
+          title="重新开启"
+          disabled={loading}
+          onClick={() => onAction(() => surveysApi.resume(item.id))}
+          className="text-gray-600 hover:text-gray-900 disabled:opacity-50"
+        >
+          <i className="fas fa-play" />
+        </button>
+        <button
+          type="button"
+          title="结束问卷"
+          disabled={loading}
+          onClick={() => {
+            if (!window.confirm('结束后将无法再接收新答卷，确定结束问卷吗？')) return
+            onAction(() => surveysApi.end(item.id))
+          }}
+          className="text-gray-600 hover:text-gray-900 disabled:opacity-50"
+        >
+          <i className="fas fa-stop" />
+        </button>
+      </>
+    )
+  }
+  return null
 }
 
 function CopyFillLinkButton({ surveyId }: { surveyId: number }) {

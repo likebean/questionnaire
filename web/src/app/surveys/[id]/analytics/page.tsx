@@ -104,25 +104,46 @@ function SummaryBlock({ question }: { question: AnalyticsQuestionVO }) {
   const s = question.summary
   if (question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE') {
     const opts = Array.isArray(s) ? (s as { optionIndex: number; label: string; count: number; ratio: number }[]) : []
+    const maxRatio = opts.length ? Math.max(...opts.map((o) => o.ratio)) : 0
     return (
-      <table className="min-w-full text-sm">
-        <thead>
-          <tr className="border-b">
-            <th className="text-left py-2">选项</th>
-            <th className="text-left py-2">人数</th>
-            <th className="text-left py-2">占比</th>
-          </tr>
-        </thead>
-        <tbody>
+      <div className="space-y-4">
+        <div className="text-sm font-medium text-gray-600 mb-2">柱状图</div>
+        <div className="space-y-3">
           {opts.map((o) => (
-            <tr key={o.optionIndex} className="border-b">
-              <td className="py-2">{o.label}</td>
-              <td className="py-2">{o.count}</td>
-              <td className="py-2">{(o.ratio * 100).toFixed(1)}%</td>
-            </tr>
+            <div key={o.optionIndex}>
+              <div className="flex justify-between text-sm text-gray-700 mb-1">
+                <span className="truncate mr-2">{o.label}</span>
+                <span className="text-gray-500 shrink-0">{o.count} 人 ({(o.ratio * 100).toFixed(1)}%)</span>
+              </div>
+              <div className="h-6 bg-gray-100 rounded overflow-hidden">
+                <div
+                  className="h-full bg-blue-500 rounded transition-all duration-300"
+                  style={{ width: `${maxRatio > 0 ? (o.ratio / maxRatio) * 100 : 0}%` }}
+                />
+              </div>
+            </div>
           ))}
-        </tbody>
-      </table>
+        </div>
+        <div className="text-sm font-medium text-gray-600 mt-4 mb-2">数据表</div>
+        <table className="min-w-full text-sm">
+          <thead>
+            <tr className="border-b">
+              <th className="text-left py-2">选项</th>
+              <th className="text-left py-2">人数</th>
+              <th className="text-left py-2">占比</th>
+            </tr>
+          </thead>
+          <tbody>
+            {opts.map((o) => (
+              <tr key={o.optionIndex} className="border-b">
+                <td className="py-2">{o.label}</td>
+                <td className="py-2">{o.count}</td>
+                <td className="py-2">{(o.ratio * 100).toFixed(1)}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     )
   }
   if (question.type === 'SCALE') {

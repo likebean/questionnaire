@@ -460,8 +460,10 @@ public class SurveyServiceImpl implements SurveyService {
         if (item.getValueType() == null) return "";
         switch (item.getValueType()) {
             case "OPTION":
-                if (item.getOptionIndex() != null) return getOptionLabel(q, item.getOptionIndex());
-                if (item.getOptionIndices() != null && !item.getOptionIndices().isEmpty()) {
+                String optLabel = "";
+                if (item.getOptionIndex() != null) {
+                    optLabel = getOptionLabel(q, item.getOptionIndex());
+                } else if (item.getOptionIndices() != null && !item.getOptionIndices().isEmpty()) {
                     try {
                         JsonNode arr = JSON.readTree(item.getOptionIndices());
                         StringBuilder sb = new StringBuilder();
@@ -470,10 +472,13 @@ public class SurveyServiceImpl implements SurveyService {
                             if (sb.length() > 0) sb.append("、");
                             sb.append(getOptionLabel(q, idx));
                         }
-                        return sb.toString();
+                        optLabel = sb.toString();
                     } catch (Exception ignored) { }
                 }
-                return "";
+                if (item.getTextValue() != null && !item.getTextValue().isBlank()) {
+                    return optLabel + "：" + item.getTextValue();
+                }
+                return optLabel;
             case "TEXT": return item.getTextValue() != null ? item.getTextValue() : "";
             case "SCALE": return item.getScaleValue() != null ? String.valueOf(item.getScaleValue()) : "";
             default: return "";

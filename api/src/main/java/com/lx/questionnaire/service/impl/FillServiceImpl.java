@@ -197,9 +197,15 @@ public class FillServiceImpl implements FillService {
         if (item.getOptionIndex() != null) {
             ri.setValueType(VALUE_TYPE_OPTION);
             ri.setOptionIndex(item.getOptionIndex());
+            if (item.getTextValue() != null && !item.getTextValue().isBlank()) {
+                ri.setTextValue(item.getTextValue());
+            }
         } else if (item.getOptionIndices() != null && item.getOptionIndices().length > 0) {
             ri.setValueType(VALUE_TYPE_OPTION);
             ri.setOptionIndices(toJsonArray(item.getOptionIndices()));
+            if (item.getTextValue() != null && !item.getTextValue().isBlank()) {
+                ri.setTextValue(item.getTextValue());
+            }
         } else if (item.getTextValue() != null) {
             ri.setValueType(VALUE_TYPE_TEXT);
             ri.setTextValue(item.getTextValue());
