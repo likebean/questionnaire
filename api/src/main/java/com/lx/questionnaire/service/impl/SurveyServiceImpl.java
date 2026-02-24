@@ -490,9 +490,13 @@ public class SurveyServiceImpl implements SurveyService {
         try {
             JsonNode node = JSON.readTree(q.getConfig());
             JsonNode opts = node.get("options");
-            if (opts != null && opts.isArray() && index >= 0 && index < opts.size()) {
+            int size = (opts != null && opts.isArray()) ? opts.size() : 0;
+            if (index >= 0 && index < size) {
                 JsonNode label = opts.get(index).get("label");
                 return label != null ? label.asText() : "选项" + index;
+            }
+            if (index == size && node.has("hasOtherOption") && node.get("hasOtherOption").asBoolean()) {
+                return "其他";
             }
         } catch (Exception ignored) { }
         return "选项" + index;
@@ -512,10 +516,16 @@ public class SurveyServiceImpl implements SurveyService {
             }
         }
         int optionCount = 0;
+        boolean hasOtherOption = false;
         try {
             if (q.getConfig() != null) {
                 JsonNode node = JSON.readTree(q.getConfig());
-                if (node.get("options") != null && node.get("options").isArray()) optionCount = node.get("options").size();
+                JsonNode opts = node.get("options");
+                if (opts != null && opts.isArray()) optionCount = opts.size();
+                if (node.has("hasOtherOption") && node.get("hasOtherOption").asBoolean()) {
+                    hasOtherOption = true;
+                    optionCount++;
+                }
             }
         } catch (Exception ignored) { }
         int totalResponses = indices.size();

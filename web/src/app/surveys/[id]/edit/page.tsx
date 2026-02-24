@@ -31,16 +31,21 @@ function parseConfig(c: string | null | undefined): Record<string, unknown> {
   }
 }
 
-type OptionItem = { sortOrder: number; label: string; isOther?: boolean; allowFill?: boolean }
+type OptionItem = { sortOrder: number; label: string }
 function getOptions(config: Record<string, unknown>): OptionItem[] {
   const o = config.options
-  if (!Array.isArray(o)) return [{ sortOrder: 0, label: '选项1', isOther: false, allowFill: false }]
-  return o.map((x: { sortOrder?: number; label?: string; isOther?: boolean; allowFill?: boolean }, i: number) => ({
+  if (!Array.isArray(o)) return [{ sortOrder: 0, label: '选项1' }]
+  return o.map((x: { sortOrder?: number; label?: string }, i: number) => ({
     sortOrder: x.sortOrder ?? i,
     label: x.label ?? `选项${i + 1}`,
-    isOther: x.isOther === true,
-    allowFill: x.allowFill === true,
   }))
+}
+
+function getOtherOptionConfig(config: Record<string, unknown>): { hasOtherOption: boolean; otherAllowFill: boolean } {
+  return {
+    hasOtherOption: config.hasOtherOption === true,
+    otherAllowFill: config.otherAllowFill === true,
+  }
 }
 
 function getInt(config: Record<string, unknown>, key: string, def: number): number {
@@ -208,8 +213,9 @@ export default function EditSurveyPage() {
       <div className="bg-white rounded-lg shadow-card p-8 mb-6">
         <div className="grid grid-cols-1 gap-4 mb-4">
           <div>
-            <label className={labelClass}>问卷标题</label>
+            <label htmlFor="edit-survey-title" className={labelClass}>问卷标题</label>
             <input
+              id="edit-survey-title"
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -406,34 +412,6 @@ function QuestionEditor({
                 }}
                 className={inputClass + ' flex-1 min-w-0'}
               />
-              <label className="flex items-center gap-1 text-sm text-gray-600 whitespace-nowrap">
-                <input
-                  type="checkbox"
-                  checked={opt.isOther === true}
-                  onChange={(e) => {
-                    const next = options.slice()
-                    next[i] = { ...next[i], isOther: e.target.checked, allowFill: e.target.checked ? next[i].allowFill : false }
-                    setOptions(next)
-                  }}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                其他
-              </label>
-              {opt.isOther && (
-                <label className="flex items-center gap-1 text-sm text-gray-600 whitespace-nowrap">
-                  <input
-                    type="checkbox"
-                    checked={opt.allowFill === true}
-                    onChange={(e) => {
-                      const next = options.slice()
-                      next[i] = { ...next[i], allowFill: e.target.checked }
-                      setOptions(next)
-                    }}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  允许填空
-                </label>
-              )}
               <button
                 type="button"
                 onClick={() => setOptions(options.filter((_, j) => j !== i))}
@@ -445,11 +423,42 @@ function QuestionEditor({
           ))}
           <button
             type="button"
-            onClick={() => setOptions([...options, { sortOrder: options.length, label: `选项${options.length + 1}`, isOther: false, allowFill: false }])}
+            onClick={() => setOptions([...options, { sortOrder: options.length, label: `选项${options.length + 1}` }])}
             className="text-blue-600 hover:underline text-sm"
           >
             添加选项
           </button>
+          {(() => {
+            const { hasOtherOption, otherAllowFill } = getOtherOptionConfig(config)
+            return (
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <label className="flex items-center gap-2 text-sm text-gray-600">
+                  <input
+                    type="checkbox"
+                    checked={hasOtherOption}
+                    onChange={(e) => {
+                      const v = e.target.checked
+                      setConfig('hasOtherOption', v)
+                      if (!v) setConfig('otherAllowFill', false)
+                    }}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  添加「其他」选项
+                </label>
+                {hasOtherOption && (
+                  <label className="flex items-center gap-2 text-sm text-gray-600 mt-2 ml-6">
+                    <input
+                      type="checkbox"
+                      checked={otherAllowFill}
+                      onChange={(e) => setConfig('otherAllowFill', e.target.checked)}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    其他项允许填空
+                  </label>
+                )}
+              </div>
+            )
+          })()}
           {question.type === 'MULTIPLE_CHOICE' && (
             <div className="mt-3 flex gap-4">
               <div>

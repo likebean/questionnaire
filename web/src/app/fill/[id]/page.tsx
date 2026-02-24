@@ -61,16 +61,17 @@ export default function FillPage() {
       if (q.required !== false) {
         const a = answers[q.id!]
         const config = parseConfig(q.config)
-        const options = (config.options as { allowFill?: boolean }[]) ?? []
-        if (q.type === 'SINGLE_CHOICE' && a?.optionIndex != null && options[a.optionIndex]?.allowFill) {
+        const opts = (config.options as unknown[]) ?? []
+        const otherIdx = opts.length
+        const otherAllowFill = config.otherAllowFill === true
+        if (q.type === 'SINGLE_CHOICE' && a?.optionIndex === otherIdx && otherAllowFill) {
           if (!a.textValue || !a.textValue.trim()) {
             alert(`请完成必填题：${q.title || '题目'}（请填写「其他」）`)
             return false
           }
         }
-        if (q.type === 'MULTIPLE_CHOICE' && a?.optionIndices?.length) {
-          const needOther = a.optionIndices.some((i) => options[i]?.allowFill)
-          if (needOther && (!a.textValue || !a.textValue.trim())) {
+        if (q.type === 'MULTIPLE_CHOICE' && otherAllowFill && a?.optionIndices?.includes(otherIdx)) {
+          if (!a.textValue || !a.textValue.trim()) {
             alert(`请完成必填题：${q.title || '题目'}（请填写「其他」）`)
             return false
           }
@@ -175,12 +176,15 @@ function FillControl({
   setAnswer: (a: Partial<SubmitItemDTO>) => void
 }) {
   const config = parseConfig(question.config)
-  const options = (config.options as { label?: string; isOther?: boolean; allowFill?: boolean }[]) ?? []
+  const options = (config.options as { label?: string }[]) ?? []
+  const hasOtherOption = config.hasOtherOption === true
+  const otherAllowFill = config.otherAllowFill === true
+  const otherIndex = options.length
 
   switch (question.type) {
     case 'SINGLE_CHOICE': {
-      const selectedOpt = answer?.optionIndex != null ? options[answer.optionIndex] : null
-      const showOtherFill = selectedOpt?.isOther === true && selectedOpt?.allowFill === true
+      const selectedIdx = answer?.optionIndex ?? -1
+      const showOtherFill = hasOtherOption && otherAllowFill && selectedIdx === otherIndex
       return (
         <div className="space-y-2">
           {options.map((opt, i) => (
@@ -188,12 +192,23 @@ function FillControl({
               <input
                 type="radio"
                 name={`q-${question.id}`}
-                checked={answer?.optionIndex === i}
+                checked={selectedIdx === i}
                 onChange={() => setAnswer({ optionIndex: i, textValue: '' })}
               />
               {opt.label ?? `选项${i + 1}`}
             </label>
           ))}
+          {hasOtherOption && (
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name={`q-${question.id}`}
+                checked={selectedIdx === otherIndex}
+                onChange={() => setAnswer({ optionIndex: otherIndex, textValue: '' })}
+              />
+              其他
+            </label>
+          )}
           {showOtherFill && (
             <div className="ml-6 mt-2">
               <input
@@ -210,8 +225,7 @@ function FillControl({
     }
     case 'MULTIPLE_CHOICE': {
       const indices = answer?.optionIndices ?? []
-      const selectedWithOther = indices.find((idx) => options[idx]?.isOther === true && options[idx]?.allowFill === true)
-      const showOtherFill = selectedWithOther !== undefined
+      const showOtherFill = hasOtherOption && otherAllowFill && indices.includes(otherIndex)
       return (
         <div className="space-y-2">
           {options.map((opt, i) => (
@@ -229,6 +243,21 @@ function FillControl({
               {opt.label ?? `选项${i + 1}`}
             </label>
           ))}
+          {hasOtherOption && (
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={indices.includes(otherIndex)}
+                onChange={(e) => {
+                  const next = e.target.checked
+                    ? [...indices, otherIndex].sort((a, b) => a - b)
+                    : indices.filter((x) => x !== otherIndex)
+                  setAnswer({ optionIndices: next })
+                }}
+              />
+              其他
+            </label>
+          )}
           {showOtherFill && (
             <div className="ml-6 mt-2">
               <input
