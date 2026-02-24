@@ -206,7 +206,7 @@ export const departmentsApi = {
 
 // ---------- 问卷 ----------
 export interface SurveyListItemVO {
-  id: number
+  id: string
   title: string
   status: string
   responseCount?: number
@@ -221,7 +221,7 @@ export interface SurveyListResponse {
 
 export interface SurveyQuestionVO {
   id?: number
-  surveyId?: number
+  surveyId?: string
   sortOrder?: number
   type: string
   title: string
@@ -231,7 +231,7 @@ export interface SurveyQuestionVO {
 }
 
 export interface SurveyDetailVO {
-  id: number
+  id: string
   title: string
   description?: string | null
   status: string
@@ -247,7 +247,7 @@ export interface SurveyDetailVO {
 }
 
 export interface FillSurveyVO {
-  id: number
+  id: string
   title: string
   description?: string | null
   thankYouText?: string | null
@@ -279,40 +279,40 @@ export const surveysApi = {
   list: (params?: { status?: string; keyword?: string; page?: number; pageSize?: number; sort?: string }) =>
     apiClient.get('/surveys', { params }) as Promise<ApiResponse<SurveyListResponse>>,
   create: (data: { title?: string; description?: string }) =>
-    apiClient.post('/surveys', data) as Promise<ApiResponse<{ id: number }>>,
-  getDetail: (id: number) =>
+    apiClient.post('/surveys', data) as Promise<ApiResponse<{ id: string }>>,
+  getDetail: (id: string) =>
     apiClient.get(`/surveys/${id}`) as Promise<ApiResponse<SurveyDetailVO>>,
-  updateBasic: (id: number, data: { title?: string; description?: string }) =>
+  updateBasic: (id: string, data: { title?: string; description?: string }) =>
     apiClient.put(`/surveys/${id}`, data) as Promise<ApiResponse<null>>,
-  updateSettings: (id: number, data: UpdateSettingsDTO) =>
+  updateSettings: (id: string, data: UpdateSettingsDTO) =>
     apiClient.put(`/surveys/${id}/settings`, data) as Promise<ApiResponse<null>>,
-  publish: (id: number) => apiClient.post(`/surveys/${id}/publish`) as Promise<ApiResponse<null>>,
-  pause: (id: number) => apiClient.post(`/surveys/${id}/pause`) as Promise<ApiResponse<null>>,
-  resume: (id: number) => apiClient.post(`/surveys/${id}/resume`) as Promise<ApiResponse<null>>,
-  end: (id: number) => apiClient.post(`/surveys/${id}/end`) as Promise<ApiResponse<null>>,
-  copy: (id: number) => apiClient.post(`/surveys/${id}/copy`) as Promise<ApiResponse<{ id: number }>>,
-  delete: (id: number) => apiClient.delete(`/surveys/${id}`) as Promise<ApiResponse<null>>,
-  getFillUrl: (id: number) =>
+  publish: (id: string) => apiClient.post(`/surveys/${id}/publish`) as Promise<ApiResponse<null>>,
+  pause: (id: string) => apiClient.post(`/surveys/${id}/pause`) as Promise<ApiResponse<null>>,
+  resume: (id: string) => apiClient.post(`/surveys/${id}/resume`) as Promise<ApiResponse<null>>,
+  end: (id: string) => apiClient.post(`/surveys/${id}/end`) as Promise<ApiResponse<null>>,
+  copy: (id: string) => apiClient.post(`/surveys/${id}/copy`) as Promise<ApiResponse<{ id: string }>>,
+  delete: (id: string) => apiClient.delete(`/surveys/${id}`) as Promise<ApiResponse<null>>,
+  getFillUrl: (id: string) =>
     apiClient.get(`/surveys/${id}/fill-url`) as Promise<ApiResponse<{ fillUrl: string }>>,
-  listQuestions: (surveyId: number) =>
+  listQuestions: (surveyId: string) =>
     apiClient.get(`/surveys/${surveyId}/questions`) as Promise<ApiResponse<SurveyQuestionVO[]>>,
-  addQuestion: (surveyId: number, question: Partial<SurveyQuestionVO>) =>
+  addQuestion: (surveyId: string, question: Partial<SurveyQuestionVO>) =>
     apiClient.post(`/surveys/${surveyId}/questions`, question) as Promise<ApiResponse<SurveyQuestionVO>>,
-  updateQuestion: (surveyId: number, questionId: number, question: Partial<SurveyQuestionVO>) =>
+  updateQuestion: (surveyId: string, questionId: number, question: Partial<SurveyQuestionVO>) =>
     apiClient.put(`/surveys/${surveyId}/questions/${questionId}`, question) as Promise<ApiResponse<null>>,
-  updateQuestionOrder: (surveyId: number, questionIds: number[]) =>
+  updateQuestionOrder: (surveyId: string, questionIds: number[]) =>
     apiClient.put(`/surveys/${surveyId}/questions/order`, questionIds) as Promise<ApiResponse<null>>,
-  copyQuestion: (surveyId: number, questionId: number) =>
+  copyQuestion: (surveyId: string, questionId: number) =>
     apiClient.post(`/surveys/${surveyId}/questions/${questionId}/copy`) as Promise<ApiResponse<SurveyQuestionVO>>,
-  deleteQuestion: (surveyId: number, questionId: number) =>
+  deleteQuestion: (surveyId: string, questionId: number) =>
     apiClient.delete(`/surveys/${surveyId}/questions/${questionId}`) as Promise<ApiResponse<null>>,
-  listResponses: (surveyId: number, params?: { page?: number; pageSize?: number }) =>
+  listResponses: (surveyId: string, params?: { page?: number; pageSize?: number }) =>
     apiClient.get(`/surveys/${surveyId}/responses`, { params }) as Promise<ApiResponse<ResponseListResponse>>,
-  getResponseDetail: (surveyId: number, responseId: number) =>
+  getResponseDetail: (surveyId: string, responseId: number) =>
     apiClient.get(`/surveys/${surveyId}/responses/${responseId}`) as Promise<ApiResponse<ResponseDetailVO>>,
-  getAnalytics: (surveyId: number) =>
+  getAnalytics: (surveyId: string) =>
     apiClient.get(`/surveys/${surveyId}/analytics`) as Promise<ApiResponse<AnalyticsResponse>>,
-  exportResponses: (surveyId: number) =>
+  exportResponses: (surveyId: string) =>
     apiClient.get(`/surveys/${surveyId}/export`, { responseType: 'blob' }) as Promise<Blob>,
 }
 
@@ -366,8 +366,8 @@ export interface AnalyticsResponse {
 }
 
 export const fillApi = {
-  getMetadata: (id: number) =>
+  getMetadata: (id: string) =>
     apiClient.get(`/fill/${id}`) as Promise<ApiResponse<FillSurveyVO>>,
-  submit: (id: number, data: SubmitRequestDTO) =>
+  submit: (id: string, data: SubmitRequestDTO) =>
     apiClient.post(`/fill/${id}/submit`, data) as Promise<ApiResponse<null>>,
 }

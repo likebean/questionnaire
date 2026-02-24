@@ -12,44 +12,44 @@ public interface SurveyService {
 
     Survey create(String creatorId, String title, String description);
 
-    SurveyDetailVO getDetail(Long id, String currentUserId);
+    SurveyDetailVO getDetail(String id, String currentUserId);
 
-    void updateBasic(Long id, String currentUserId, String title, String description);
+    void updateBasic(String id, String currentUserId, String title, String description);
 
-    void updateSettings(Long id, String currentUserId, Boolean limitOncePerUser, Boolean allowAnonymous,
+    void updateSettings(String id, String currentUserId, Boolean limitOncePerUser, Boolean allowAnonymous,
                         java.time.LocalDateTime startTime, java.time.LocalDateTime endTime, String thankYouText);
 
-    void publish(Long id, String currentUserId);
+    void publish(String id, String currentUserId);
 
-    void pause(Long id, String currentUserId);
+    void pause(String id, String currentUserId);
 
-    void resume(Long id, String currentUserId);
+    void resume(String id, String currentUserId);
 
-    void end(Long id, String currentUserId);
+    void end(String id, String currentUserId);
 
-    Survey copy(Long id, String currentUserId);
+    Survey copy(String id, String currentUserId);
 
-    void delete(Long id, String currentUserId);
+    void delete(String id, String currentUserId);
 
-    String getFillUrl(Long id);
+    String getFillUrl(String id);
 
-    List<SurveyQuestion> listQuestions(Long surveyId, String currentUserId);
+    List<SurveyQuestion> listQuestions(String surveyId, String currentUserId);
 
-    SurveyQuestion addQuestion(Long surveyId, String currentUserId, SurveyQuestion question);
+    SurveyQuestion addQuestion(String surveyId, String currentUserId, SurveyQuestion question);
 
-    void updateQuestion(Long surveyId, Long questionId, String currentUserId, SurveyQuestion question);
+    void updateQuestion(String surveyId, Long questionId, String currentUserId, SurveyQuestion question);
 
-    void updateQuestionOrder(Long surveyId, String currentUserId, List<Long> questionIds);
+    void updateQuestionOrder(String surveyId, String currentUserId, List<Long> questionIds);
 
-    SurveyQuestion copyQuestion(Long surveyId, Long questionId, String currentUserId);
+    SurveyQuestion copyQuestion(String surveyId, Long questionId, String currentUserId);
 
-    void deleteQuestion(Long surveyId, Long questionId, String currentUserId);
+    void deleteQuestion(String surveyId, Long questionId, String currentUserId);
 
-    ResponseListResponse listResponses(Long surveyId, String currentUserId, int page, int pageSize);
+    ResponseListResponse listResponses(String surveyId, String currentUserId, int page, int pageSize);
 
-    ResponseDetailVO getResponseDetail(Long surveyId, Long responseId, String currentUserId);
+    ResponseDetailVO getResponseDetail(String surveyId, Long responseId, String currentUserId);
 
-    AnalyticsResponse getAnalytics(Long surveyId, String currentUserId);
+    AnalyticsResponse getAnalytics(String surveyId, String currentUserId);
 
-    byte[] exportResponses(Long surveyId, String currentUserId);
+    byte[] exportResponses(String surveyId, String currentUserId);
 }

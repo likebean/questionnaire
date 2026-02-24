@@ -427,7 +427,7 @@ function SurveyStatusActions({
   return null
 }
 
-function CopyFillLinkButton({ surveyId }: { surveyId: number }) {
+function CopyFillLinkButton({ surveyId }: { surveyId: string }) {
   const [copied, setCopied] = useState(false)
   const handleCopy = () => {
     surveysApi.getFillUrl(surveyId).then((res) => {
@@ -456,7 +456,7 @@ function CopySurveyButton({
   router,
   onDone,
 }: {
-  surveyId: number
+  surveyId: string
   router: ReturnType<typeof useRouter>
   onDone: () => void
 }) {

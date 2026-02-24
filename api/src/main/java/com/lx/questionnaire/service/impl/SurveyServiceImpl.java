@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -48,7 +49,7 @@ public class SurveyServiceImpl implements SurveyService {
         }
     }
 
-    private Survey requireSurvey(Long id) {
+    private Survey requireSurvey(String id) {
         Survey s = surveyMapper.selectById(id);
         if (s == null) {
             throw new BusinessException(ErrorCode.SURVEY_NOT_FOUND);
@@ -90,6 +91,7 @@ public class SurveyServiceImpl implements SurveyService {
     @Transactional
     public Survey create(String creatorId, String title, String description) {
         Survey s = new Survey();
+        s.setId(UUID.randomUUID().toString());
         s.setTitle(title != null ? title : "未命名问卷");
         s.setDescription(description);
         s.setStatus(STATUS_DRAFT);
@@ -101,7 +103,7 @@ public class SurveyServiceImpl implements SurveyService {
     }
 
     @Override
-    public SurveyDetailVO getDetail(Long id, String currentUserId) {
+    public SurveyDetailVO getDetail(String id, String currentUserId) {
         Survey s = requireSurvey(id);
         requireCreator(s, currentUserId);
         List<SurveyQuestion> questions = surveyQuestionMapper.selectList(
@@ -110,7 +112,7 @@ public class SurveyServiceImpl implements SurveyService {
     }
 
     @Override
-    public void updateBasic(Long id, String currentUserId, String title, String description) {
+    public void updateBasic(String id, String currentUserId, String title, String description) {
         Survey s = requireSurvey(id);
         requireCreator(s, currentUserId);
         if (title != null) s.setTitle(title);
@@ -119,7 +121,7 @@ public class SurveyServiceImpl implements SurveyService {
     }
 
     @Override
-    public void updateSettings(Long id, String currentUserId, Boolean limitOncePerUser, Boolean allowAnonymous,
+    public void updateSettings(String id, String currentUserId, Boolean limitOncePerUser, Boolean allowAnonymous,
                                LocalDateTime startTime, LocalDateTime endTime, String thankYouText) {
         Survey s = requireSurvey(id);
         requireCreator(s, currentUserId);
@@ -133,7 +135,7 @@ public class SurveyServiceImpl implements SurveyService {
 
     @Override
     @Transactional
-    public void publish(Long id, String currentUserId) {
+    public void publish(String id, String currentUserId) {
         Survey s = requireSurvey(id);
         requireCreator(s, currentUserId);
         if (!STATUS_DRAFT.equals(s.getStatus())) {
@@ -169,7 +171,7 @@ public class SurveyServiceImpl implements SurveyService {
     }
 
     @Override
-    public void pause(Long id, String currentUserId) {
+    public void pause(String id, String currentUserId) {
         Survey s = requireSurvey(id);
         requireCreator(s, currentUserId);
         if (!STATUS_COLLECTING.equals(s.getStatus())) throw new BusinessException(ErrorCode.PARAM_ERROR);
@@ -178,7 +180,7 @@ public class SurveyServiceImpl implements SurveyService {
     }
 
     @Override
-    public void resume(Long id, String currentUserId) {
+    public void resume(String id, String currentUserId) {
         Survey s = requireSurvey(id);
         requireCreator(s, currentUserId);
         if (!STATUS_PAUSED.equals(s.getStatus())) throw new BusinessException(ErrorCode.PARAM_ERROR);
@@ -187,7 +189,7 @@ public class SurveyServiceImpl implements SurveyService {
     }
 
     @Override
-    public void end(Long id, String currentUserId) {
+    public void end(String id, String currentUserId) {
         Survey s = requireSurvey(id);
         requireCreator(s, currentUserId);
         if (STATUS_ENDED.equals(s.getStatus())) return;
@@ -197,10 +199,11 @@ public class SurveyServiceImpl implements SurveyService {
 
     @Override
     @Transactional
-    public Survey copy(Long id, String currentUserId) {
+    public Survey copy(String id, String currentUserId) {
         Survey s = requireSurvey(id);
         requireCreator(s, currentUserId);
         Survey copy = new Survey();
+        copy.setId(UUID.randomUUID().toString());
         copy.setTitle(s.getTitle() + " (副本)");
         copy.setDescription(s.getDescription());
         copy.setStatus(STATUS_DRAFT);
@@ -228,20 +231,20 @@ public class SurveyServiceImpl implements SurveyService {
     }
 
     @Override
-    public void delete(Long id, String currentUserId) {
+    public void delete(String id, String currentUserId) {
         Survey s = requireSurvey(id);
         requireCreator(s, currentUserId);
         surveyMapper.deleteById(id);
     }
 
     @Override
-    public String getFillUrl(Long id) {
+    public String getFillUrl(String id) {
         Survey s = requireSurvey(id);
         return "/fill/" + id;
     }
 
     @Override
-    public List<SurveyQuestion> listQuestions(Long surveyId, String currentUserId) {
+    public List<SurveyQuestion> listQuestions(String surveyId, String currentUserId) {
         Survey s = requireSurvey(surveyId);
         requireCreator(s, currentUserId);
         return surveyQuestionMapper.selectList(
@@ -249,7 +252,7 @@ public class SurveyServiceImpl implements SurveyService {
     }
 
     @Override
-    public SurveyQuestion addQuestion(Long surveyId, String currentUserId, SurveyQuestion question) {
+    public SurveyQuestion addQuestion(String surveyId, String currentUserId, SurveyQuestion question) {
         Survey s = requireSurvey(surveyId);
         requireCreator(s, currentUserId);
         question.setSurveyId(surveyId);
@@ -264,7 +267,7 @@ public class SurveyServiceImpl implements SurveyService {
     }
 
     @Override
-    public void updateQuestion(Long surveyId, Long questionId, String currentUserId, SurveyQuestion question) {
+    public void updateQuestion(String surveyId, Long questionId, String currentUserId, SurveyQuestion question) {
         Survey s = requireSurvey(surveyId);
         requireCreator(s, currentUserId);
         SurveyQuestion existing = surveyQuestionMapper.selectOne(
@@ -279,7 +282,7 @@ public class SurveyServiceImpl implements SurveyService {
     }
 
     @Override
-    public void updateQuestionOrder(Long surveyId, String currentUserId, List<Long> questionIds) {
+    public void updateQuestionOrder(String surveyId, String currentUserId, List<Long> questionIds) {
         Survey s = requireSurvey(surveyId);
         requireCreator(s, currentUserId);
         for (int i = 0; i < questionIds.size(); i++) {
@@ -293,7 +296,7 @@ public class SurveyServiceImpl implements SurveyService {
 
     @Override
     @Transactional
-    public SurveyQuestion copyQuestion(Long surveyId, Long questionId, String currentUserId) {
+    public SurveyQuestion copyQuestion(String surveyId, Long questionId, String currentUserId) {
         Survey s = requireSurvey(surveyId);
         requireCreator(s, currentUserId);
         SurveyQuestion src = surveyQuestionMapper.selectOne(
@@ -319,7 +322,7 @@ public class SurveyServiceImpl implements SurveyService {
     }
 
     @Override
-    public void deleteQuestion(Long surveyId, Long questionId, String currentUserId) {
+    public void deleteQuestion(String surveyId, Long questionId, String currentUserId) {
         Survey s = requireSurvey(surveyId);
         requireCreator(s, currentUserId);
         surveyQuestionMapper.delete(new LambdaQueryWrapper<SurveyQuestion>()
@@ -327,7 +330,7 @@ public class SurveyServiceImpl implements SurveyService {
     }
 
     @Override
-    public ResponseListResponse listResponses(Long surveyId, String currentUserId, int page, int pageSize) {
+    public ResponseListResponse listResponses(String surveyId, String currentUserId, int page, int pageSize) {
         Survey s = requireSurvey(surveyId);
         requireCreator(s, currentUserId);
         Page<Response> p = new Page<>(page, pageSize);
@@ -357,7 +360,7 @@ public class SurveyServiceImpl implements SurveyService {
     }
 
     @Override
-    public ResponseDetailVO getResponseDetail(Long surveyId, Long responseId, String currentUserId) {
+    public ResponseDetailVO getResponseDetail(String surveyId, Long responseId, String currentUserId) {
         Survey s = requireSurvey(surveyId);
         requireCreator(s, currentUserId);
         Response r = responseMapper.selectOne(new LambdaQueryWrapper<Response>()
@@ -387,7 +390,7 @@ public class SurveyServiceImpl implements SurveyService {
     }
 
     @Override
-    public AnalyticsResponse getAnalytics(Long surveyId, String currentUserId) {
+    public AnalyticsResponse getAnalytics(String surveyId, String currentUserId) {
         Survey s = requireSurvey(surveyId);
         requireCreator(s, currentUserId);
         List<SurveyQuestion> questions = surveyQuestionMapper.selectList(
@@ -417,7 +420,7 @@ public class SurveyServiceImpl implements SurveyService {
     }
 
     @Override
-    public byte[] exportResponses(Long surveyId, String currentUserId) {
+    public byte[] exportResponses(String surveyId, String currentUserId) {
         Survey s = requireSurvey(surveyId);
         requireCreator(s, currentUserId);
         List<SurveyQuestion> questions = surveyQuestionMapper.selectList(

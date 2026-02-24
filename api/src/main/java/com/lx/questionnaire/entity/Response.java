@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 public class Response {
     @TableId(type = IdType.AUTO)
     private Long id;
-    private Long surveyId;
+    private String surveyId;
     private String userId;
     private LocalDateTime submittedAt;
     private Integer durationSeconds;

@@ -10,8 +10,8 @@ import java.time.LocalDateTime;
 @Data
 @TableName("survey")
 public class Survey {
-    @TableId(type = IdType.AUTO)
-    private Long id;
+    @TableId(type = IdType.INPUT)
+    private String id;
     private String title;
     private String description;
     private String status; // DRAFT, COLLECTING, PAUSED, ENDED

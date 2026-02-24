@@ -50,7 +50,7 @@ public class FillServiceImpl implements FillService {
     private final ObjectMapper objectMapper;
 
     @Override
-    public FillSurveyVO getFillMetadata(Long surveyId, String userId) {
+    public FillSurveyVO getFillMetadata(String surveyId, String userId) {
         Survey s = surveyMapper.selectById(surveyId);
         if (s == null) {
             throw new BusinessException(ErrorCode.SURVEY_NOT_FOUND);
@@ -82,7 +82,7 @@ public class FillServiceImpl implements FillService {
 
     @Override
     @Transactional
-    public void submit(Long surveyId, String userId, SubmitRequestDTO request) {
+    public void submit(String surveyId, String userId, SubmitRequestDTO request) {
         getFillMetadata(surveyId, userId);
 
         List<SurveyQuestion> questions = surveyQuestionMapper.selectList(
@@ -109,7 +109,7 @@ public class FillServiceImpl implements FillService {
         }
     }
 
-    private void validateSubmitItems(Long surveyId, List<SubmitItemDTO> items, Map<Long, SurveyQuestion> questionMap) {
+    private void validateSubmitItems(String surveyId, List<SubmitItemDTO> items, Map<Long, SurveyQuestion> questionMap) {
         if (items == null) items = List.of();
 
         Set<Long> answeredIds = new HashSet<>();

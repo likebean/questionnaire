@@ -182,7 +182,7 @@ function SortableOptionRow({
 export default function EditSurveyPage() {
   const params = useParams()
   const router = useRouter()
-  const id = Number(params.id)
+  const id = params.id as string
   const [survey, setSurvey] = useState<SurveyDetailVO | null>(null)
   const [loading, setLoading] = useState(true)
   const [publishing, setPublishing] = useState(false)
@@ -415,7 +415,7 @@ function QuestionEditor({
   onDelete,
   onCopy,
 }: {
-  surveyId: number
+  surveyId: string
   question: SurveyQuestionVO
   onUpdate: (patch: Partial<SurveyQuestionVO>) => void
   onDelete: () => void

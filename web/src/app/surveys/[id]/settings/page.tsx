@@ -11,7 +11,7 @@ const labelClass = 'block text-sm text-gray-600 mb-1'
 
 export default function SettingsPage() {
   const params = useParams()
-  const id = Number(params.id)
+  const id = params.id as string
   const [survey, setSurvey] = useState<SurveyDetailVO | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)

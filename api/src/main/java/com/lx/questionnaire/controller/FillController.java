@@ -24,7 +24,7 @@ public class FillController {
      * 获取填写页元数据。允许匿名时未登录也可访问；否则需登录。
      */
     @GetMapping("/{id}")
-    public Result<FillSurveyVO> getFillMetadata(@PathVariable Long id) {
+    public Result<FillSurveyVO> getFillMetadata(@PathVariable String id) {
         Survey s = surveyMapper.selectById(id);
         if (s == null) {
             throw new BusinessException(ErrorCode.SURVEY_NOT_FOUND);
@@ -40,7 +40,7 @@ public class FillController {
      * 提交答卷。允许匿名时未登录也可提交（userId 为 null）；否则需登录。
      */
     @PostMapping("/{id}/submit")
-    public Result<Void> submit(@PathVariable Long id, @RequestBody SubmitRequestDTO request) {
+    public Result<Void> submit(@PathVariable String id, @RequestBody SubmitRequestDTO request) {
         Survey s = surveyMapper.selectById(id);
         if (s == null) {
             throw new BusinessException(ErrorCode.SURVEY_NOT_FOUND);

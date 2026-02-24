@@ -138,7 +138,7 @@ function surveyDataToItems(
 
 export default function FillPage() {
   const params = useParams()
-  const id = Number(params.id)
+  const id = params.id as string
   const [meta, setMeta] = useState<FillSurveyVO | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<{ code: number; message: string } | null>(null)

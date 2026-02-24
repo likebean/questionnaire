@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 public class SurveyQuestion {
     @TableId(type = IdType.AUTO)
     private Long id;
-    private Long surveyId;
+    private String surveyId;
     private Integer sortOrder;
     private String type; // SINGLE_CHOICE, MULTIPLE_CHOICE, SHORT_TEXT, LONG_TEXT, SCALE
     private String title;

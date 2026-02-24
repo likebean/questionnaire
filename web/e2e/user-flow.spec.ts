@@ -44,8 +44,8 @@ test.describe('完整用户流程', () => {
       page.getByText(/当前用户|暂无问卷|创建问卷|问卷标题/).first()
     ).toBeVisible()
 
-    // 6. 点击「返回首页」回到首页
-    await page.getByRole('link', { name: '返回首页' }).click()
+    // 6. 点击侧栏「首页」回到首页
+    await page.getByRole('link', { name: '首页' }).click()
     await expect(page).toHaveURL('/')
     await expect(page.getByText('欢迎使用问卷系统')).toBeVisible()
   })

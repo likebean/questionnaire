@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 
 @Data
 public class SurveyListItemVO {
-    private Long id;
+    private String id;
     private String title;
     private String status;
     private Long responseCount;

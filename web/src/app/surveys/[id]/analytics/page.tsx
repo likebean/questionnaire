@@ -32,7 +32,7 @@ type ChartType = 'pie' | 'bar'
 
 export default function AnalyticsPage() {
   const params = useParams()
-  const id = Number(params.id)
+  const id = params.id as string
   const [survey, setSurvey] = useState<SurveyDetailVO | null>(null)
   const [data, setData] = useState<AnalyticsResponse | null>(null)
   const [loading, setLoading] = useState(true)
