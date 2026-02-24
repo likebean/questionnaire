@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@/app/_components/AuthContext'
 import {
   surveysApi,
   type SurveyListItemVO,
@@ -19,7 +18,6 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 export default function MySurveysPage() {
-  const { user } = useAuth()
   const router = useRouter()
   const [data, setData] = useState<SurveyListResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -29,6 +27,8 @@ export default function MySurveysPage() {
   const [page, setPage] = useState(1)
   const pageSize = 20
   const [creating, setCreating] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<SurveyListItemVO | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const load = () => {
     setLoading(true)
@@ -63,186 +63,274 @@ export default function MySurveysPage() {
       .finally(() => setCreating(false))
   }
 
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await surveysApi.delete(deleteTarget.id)
+      load()
+      setDeleteTarget(null)
+    } catch {
+      alert('删除失败')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const canShowResponses = (s: SurveyListItemVO) =>
     ['COLLECTING', 'PAUSED', 'ENDED'].includes(s.status)
 
-  return (
-    <div className="max-w-5xl">
-      <h1 className="text-2xl font-bold text-gray-800 mb-4">我的问卷</h1>
-      {user && (
-        <p className="text-gray-600 mb-4">
-          当前用户：{user.nickname || user.id}
-          {user.roleCodes?.length ? `（${user.roleCodes.join('、')}）` : ''}
-        </p>
-      )}
+  const totalPages = data ? Math.ceil(data.total / pageSize) : 0
+  const pageButtons = Array.from({ length: Math.min(totalPages, 10) }, (_, i) => i + 1)
 
-      <div className="flex flex-wrap gap-4 mb-4 items-center">
-        <form onSubmit={handleSearch} className="flex gap-2 flex-wrap">
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="border rounded px-2 py-1"
-          >
-            <option value="">全部状态</option>
-            <option value="DRAFT">草稿</option>
-            <option value="COLLECTING">收集中</option>
-            <option value="PAUSED">已暂停</option>
-            <option value="ENDED">已结束</option>
-          </select>
-          <input
-            type="text"
-            placeholder="搜索问卷标题"
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            className="border rounded px-2 py-1 w-48"
-          />
-          <button type="submit" className="bg-gray-200 px-3 py-1 rounded hover:bg-gray-300">
-            搜索
-          </button>
-        </form>
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value)}
-          className="border rounded px-2 py-1"
+  return (
+    <div className="p-0">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">我的问卷</h1>
+        <Link
+          href="#"
+          onClick={(e) => {
+            e.preventDefault()
+            handleCreate()
+          }}
+          className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg flex items-center shadow disabled:opacity-50"
+          style={{ pointerEvents: creating ? 'none' : undefined }}
         >
-          <option value="updatedAt">最近更新</option>
-          <option value="createdAt">最近创建</option>
-        </select>
-        <button
-          type="button"
-          onClick={handleCreate}
-          disabled={creating}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
-        >
-          {creating ? '创建中...' : '创建问卷'}
-        </button>
+          <i className="fas fa-plus mr-2" /> 创建问卷
+        </Link>
       </div>
 
-      {loading ? (
-        <p className="text-gray-500">加载中...</p>
-      ) : !data?.list?.length ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-          暂无问卷。点击「创建问卷」开始，填写通过分享链接参与。
-        </div>
-      ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="mb-6 bg-white rounded-lg shadow-card p-4">
+        <form onSubmit={handleSearch} className="flex flex-wrap items-center gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">状态</label>
+            <select
+              className="focus:ring-blue-500 focus:border-blue-500 block w-full sm:w-40 py-2 border border-gray-300 rounded-md bg-white text-gray-900 shadow-sm text-sm"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              <option value="">全部状态</option>
+              <option value="DRAFT">草稿</option>
+              <option value="COLLECTING">收集中</option>
+              <option value="PAUSED">已暂停</option>
+              <option value="ENDED">已结束</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">搜索问卷</label>
+            <div className="relative rounded-md shadow-sm">
+              <input
+                type="text"
+                className="focus:ring-blue-500 focus:border-blue-500 block w-full sm:w-64 pr-10 py-2 border border-gray-300 rounded-md bg-white text-gray-900 shadow-sm text-sm pl-3"
+                placeholder="输入问卷标题"
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+              />
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <i className="fas fa-search text-gray-400" />
+              </div>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">排序</label>
+            <select
+              className="focus:ring-blue-500 focus:border-blue-500 block w-full sm:w-40 py-2 border border-gray-300 rounded-md bg-white text-gray-900 shadow-sm text-sm"
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+            >
+              <option value="updatedAt">最近更新</option>
+              <option value="createdAt">最近创建</option>
+            </select>
+          </div>
+        </form>
+      </div>
+
+      <div className="bg-white rounded-xl shadow overflow-hidden">
+        <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-100">
               <tr>
-                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">问卷标题</th>
-                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">状态</th>
-                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">回收数</th>
-                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">更新时间</th>
-                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">操作</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                  问卷标题
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                  状态
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                  回收数
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                  更新时间
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                  操作
+                </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
-              {data.list.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-2">
-                    <Link
-                      href={`/surveys/${item.id}/edit`}
-                      className="text-blue-600 hover:underline font-medium"
-                    >
-                      {item.title || '未命名问卷'}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-2">
-                    <span
-                      className={
-                        'px-2 py-0.5 rounded text-sm ' +
-                        (item.status === 'DRAFT'
-                          ? 'bg-gray-200'
-                          : item.status === 'COLLECTING'
-                            ? 'bg-green-100 text-green-800'
-                            : item.status === 'PAUSED'
-                              ? 'bg-yellow-100'
-                              : 'bg-gray-100')
-                      }
-                    >
-                      {STATUS_LABELS[item.status] ?? item.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2 text-gray-600">
-                    {canShowResponses(item) ? (item.responseCount ?? 0) : '—'}
-                  </td>
-                  <td className="px-4 py-2 text-gray-600 text-sm">
-                    {item.updatedAt
-                      ? new Date(item.updatedAt).toLocaleString('zh-CN')
-                      : '—'}
-                  </td>
-                  <td className="px-4 py-2">
-                    <div className="flex flex-wrap gap-2">
-                      <Link
-                        href={`/surveys/${item.id}/edit`}
-                        className="text-blue-600 hover:underline text-sm"
-                      >
-                        设计
-                      </Link>
-                      <Link
-                        href={`/surveys/${item.id}/settings`}
-                        className="text-blue-600 hover:underline text-sm"
-                      >
-                        设置
-                      </Link>
-                      {canShowResponses(item) && (
-                        <>
-                          <Link
-                            href={`/surveys/${item.id}/responses`}
-                            className="text-blue-600 hover:underline text-sm"
-                          >
-                            答卷
-                          </Link>
-                          <Link
-                            href={`/surveys/${item.id}/analytics`}
-                            className="text-blue-600 hover:underline text-sm"
-                          >
-                            统计
-                          </Link>
-                        </>
-                      )}
-                      {item.status === 'DRAFT' && (
-                        <span className="text-gray-400 text-sm">发布后可发放/答卷/统计</span>
-                      )}
-                      <CopyFillLinkButton surveyId={item.id} />
-                      <CopySurveyButton surveyId={item.id} router={router} onDone={load} />
-                      <DeleteSurveyButton surveyId={item.id} onDone={load} />
-                    </div>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="text-center py-8 text-gray-400">
+                    加载中...
                   </td>
                 </tr>
-              ))}
+              ) : !data?.list?.length ? (
+                <tr>
+                  <td colSpan={5} className="text-center py-8 text-gray-400">
+                    暂无问卷。点击「创建问卷」开始，填写通过分享链接参与。
+                  </td>
+                </tr>
+              ) : (
+                data.list.map((item) => (
+                  <tr key={item.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <Link
+                        href={`/surveys/${item.id}/edit`}
+                        className="text-blue-600 hover:text-blue-800 font-medium"
+                      >
+                        {item.title || '未命名问卷'}
+                      </Link>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span
+                        className={
+                          'status-badge ' +
+                          (item.status === 'DRAFT'
+                            ? 'info'
+                            : item.status === 'COLLECTING'
+                              ? 'success'
+                              : item.status === 'PAUSED'
+                                ? 'warning'
+                                : '')
+                        }
+                      >
+                        {STATUS_LABELS[item.status] ?? item.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {canShowResponses(item) ? (item.responseCount ?? 0) : '—'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {item.updatedAt
+                        ? new Date(item.updatedAt).toLocaleString('zh-CN')
+                        : '—'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <div className="flex justify-end items-center space-x-3">
+                        <Link
+                          href={`/surveys/${item.id}/edit`}
+                          className="text-gray-600 hover:text-gray-900"
+                          title="设计问卷"
+                        >
+                          <i className="fas fa-edit" />
+                        </Link>
+                        <Link
+                          href={`/surveys/${item.id}/settings`}
+                          className="text-gray-600 hover:text-gray-900"
+                          title="设置"
+                        >
+                          <i className="fas fa-cog" />
+                        </Link>
+                        {canShowResponses(item) && (
+                          <>
+                            <Link
+                              href={`/surveys/${item.id}/responses`}
+                              className="text-gray-600 hover:text-gray-900"
+                              title="查看答卷"
+                            >
+                              <i className="fas fa-list-alt" />
+                            </Link>
+                            <Link
+                              href={`/surveys/${item.id}/analytics`}
+                              className="text-gray-600 hover:text-gray-900"
+                              title="统计分析"
+                            >
+                              <i className="fas fa-chart-bar" />
+                            </Link>
+                          </>
+                        )}
+                        <CopyFillLinkButton surveyId={item.id} />
+                        <CopySurveyButton surveyId={item.id} router={router} onDone={load} />
+                        <button
+                          type="button"
+                          className="text-gray-500 hover:text-red-600"
+                          title="删除"
+                          onClick={() => setDeleteTarget(item)}
+                        >
+                          <i className="fas fa-trash" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
-          {data.total > pageSize && (
-            <div className="px-4 py-2 border-t flex justify-between items-center">
-              <span className="text-sm text-gray-600">共 {data.total} 条</span>
-              <div className="flex gap-2">
+        </div>
+      </div>
+
+      {data && data.total > 0 && (
+        <div className="mt-4 flex justify-between items-center">
+          <div className="text-sm text-gray-600">
+            显示 {(page - 1) * pageSize + 1} 至{' '}
+            {Math.min(page * pageSize, data.total)} 条，共 {data.total} 条记录
+          </div>
+          {totalPages > 1 && (
+            <div className="flex gap-2">
+              {pageButtons.map((p) => (
                 <button
+                  key={p}
                   type="button"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => p - 1)}
-                  className="px-2 py-1 border rounded disabled:opacity-50"
+                  className={`rounded-lg border px-3 py-1 text-sm ${
+                    page === p
+                      ? 'bg-blue-50 text-blue-600 border-blue-200'
+                      : 'text-gray-700 border-gray-300 hover:bg-blue-50 hover:text-blue-600'
+                  } transition`}
+                  onClick={() => setPage(p)}
                 >
-                  上一页
+                  {p}
                 </button>
-                <button
-                  type="button"
-                  disabled={page * pageSize >= data.total}
-                  onClick={() => setPage((p) => p + 1)}
-                  className="px-2 py-1 border rounded disabled:opacity-50"
-                >
-                  下一页
-                </button>
-              </div>
+              ))}
             </div>
           )}
         </div>
       )}
-      <p className="mt-4">
-        <Link href="/" className="text-blue-600 hover:underline">
-          返回首页
-        </Link>
-      </p>
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/20"
+            onClick={() => !deleting && setDeleteTarget(null)}
+          />
+          <div className="relative bg-white rounded-xl shadow-lg border border-gray-200 p-6 max-w-md w-full mx-4">
+            <div className="flex justify-center text-red-500 mb-4">
+              <i className="fas fa-exclamation-triangle text-4xl" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 text-center">确认删除</h3>
+            <p className="text-gray-600 mt-4 text-center">
+              确定要删除问卷「{deleteTarget.title || '未命名问卷'}」吗？此操作无法撤销。
+            </p>
+            <div className="mt-6 flex justify-center space-x-4">
+              <button
+                type="button"
+                className="px-5 py-2 rounded-lg font-semibold border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
+                onClick={() => !deleting && setDeleteTarget(null)}
+                disabled={deleting}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className="px-5 py-2 rounded-lg font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                onClick={handleDeleteConfirm}
+                disabled={deleting}
+              >
+                {deleting ? '删除中...' : '确认'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -263,9 +351,10 @@ function CopyFillLinkButton({ surveyId }: { surveyId: number }) {
     <button
       type="button"
       onClick={handleCopy}
-      className="text-blue-600 hover:underline text-sm"
+      title="复制填写链接"
+      className="text-gray-600 hover:text-gray-900"
     >
-      {copied ? '已复制' : '复制链接'}
+      <i className={copied ? 'fas fa-check text-green-600' : 'fas fa-link'} />
     </button>
   )
 }
@@ -295,35 +384,10 @@ function CopySurveyButton({
       type="button"
       onClick={handleCopy}
       disabled={loading}
-      className="text-blue-600 hover:underline text-sm disabled:opacity-50"
+      title="复制问卷"
+      className="text-gray-600 hover:text-gray-900 disabled:opacity-50"
     >
-      {loading ? '复制中...' : '复制'}
-    </button>
-  )
-}
-
-function DeleteSurveyButton({ surveyId, onDone }: { surveyId: number; onDone: () => void }) {
-  const [loading, setLoading] = useState(false)
-  const [confirm, setConfirm] = useState(false)
-  const handleDelete = () => {
-    if (!confirm) {
-      setConfirm(true)
-      return
-    }
-    setLoading(true)
-    surveysApi
-      .delete(surveyId)
-      .then(() => onDone())
-      .finally(() => setLoading(false))
-  }
-  return (
-    <button
-      type="button"
-      onClick={handleDelete}
-      disabled={loading}
-      className="text-red-600 hover:underline text-sm disabled:opacity-50"
-    >
-      {loading ? '删除中...' : confirm ? '确认删除？' : '删除'}
+      <i className="fas fa-copy" />
     </button>
   )
 }

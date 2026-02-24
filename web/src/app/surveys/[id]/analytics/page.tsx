@@ -54,43 +54,43 @@ export default function AnalyticsPage() {
       .finally(() => setExporting(false))
   }
 
-  if (!survey) return <div className="max-w-4xl">加载中...</div>
+  if (!survey) return <div className="p-0">加载中...</div>
 
   return (
-    <div className="max-w-4xl">
-      <div className="mb-4">
-        <Link href="/surveys" className="text-blue-600 hover:underline">
-          我的问卷
-        </Link>
-        <span className="text-gray-400 mx-2">/</span>
-        <Link href={`/surveys/${id}/edit`} className="text-blue-600 hover:underline">
-          {survey.title}
-        </Link>
-        <span className="text-gray-400 mx-2">/</span>
-        <span>统计分析</span>
-      </div>
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-xl font-bold text-gray-800">单题统计</h1>
+    <div className="p-0">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">单题统计</h1>
         <button
           type="button"
           onClick={handleExport}
           disabled={exporting}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+          className="px-5 py-2 rounded-lg font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 shadow-sm"
         >
-          {exporting ? '导出中...' : '导出 Excel'}
+          {exporting ? '导出中...' : '导出 CSV'}
         </button>
+      </div>
+      <div className="mb-4 flex gap-2 items-center text-sm text-gray-600">
+        <Link href="/surveys" className="text-blue-600 hover:underline">
+          我的问卷
+        </Link>
+        <span className="text-gray-400">/</span>
+        <Link href={`/surveys/${id}/edit`} className="text-blue-600 hover:underline">
+          {survey.title}
+        </Link>
+        <span className="text-gray-400">/</span>
+        <span>统计分析</span>
       </div>
       {loading ? (
         <p className="text-gray-500">加载中...</p>
       ) : !data?.questions?.length ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+        <div className="bg-white rounded-lg shadow-card p-8 text-center text-gray-500">
           暂无数据
         </div>
       ) : (
         <div className="space-y-6">
           {data.questions.map((q) => (
-            <div key={q.questionId} className="bg-white rounded-lg shadow p-4">
-              <h3 className="font-medium text-gray-800 mb-2">{q.title}</h3>
+            <div key={q.questionId} className="bg-white rounded-lg shadow-card p-6">
+              <h3 className="font-medium text-gray-800 mb-3">{q.title}</h3>
               <SummaryBlock question={q} />
             </div>
           ))}

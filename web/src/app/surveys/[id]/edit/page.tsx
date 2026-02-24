@@ -10,6 +10,10 @@ import {
   type ApiResponse,
 } from '@/services/api'
 
+const inputClass =
+  'block w-full rounded-md border border-gray-300 bg-white text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-2 pl-3'
+const labelClass = 'block text-sm text-gray-600 mb-1'
+
 const TYPES = [
   { value: 'SINGLE_CHOICE', label: '单选题' },
   { value: 'MULTIPLE_CHOICE', label: '多选题' },
@@ -154,7 +158,7 @@ export default function EditSurveyPage() {
 
   if (loading || !survey) {
     return (
-      <div className="max-w-4xl">
+      <div className="p-0">
         <p className="text-gray-500">加载中...</p>
         <Link href="/surveys" className="text-blue-600 hover:underline mt-2 inline-block">
           返回列表
@@ -164,77 +168,82 @@ export default function EditSurveyPage() {
   }
 
   return (
-    <div className="max-w-6xl flex gap-6">
-      <div className="flex-1">
-        <div className="mb-4 flex gap-2 items-center">
-          <Link href="/surveys" className="text-blue-600 hover:underline">
-            我的问卷
+    <div className="p-0">
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">编辑问卷</h1>
+      <div className="bg-white rounded-lg shadow-card p-8 mb-6">
+        <div className="grid grid-cols-1 gap-4 mb-4">
+          <div>
+            <label className={labelClass}>问卷标题</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>问卷说明</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className={inputClass}
+              rows={3}
+            />
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleSaveBasic}
+            disabled={saving}
+            className="px-5 py-2 rounded-lg font-semibold border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-50 shadow-sm"
+          >
+            {saving ? '保存中...' : isDraft ? '保存草稿' : '保存'}
+          </button>
+          {isDraft && (
+            <button
+              type="button"
+              onClick={handlePublish}
+              disabled={publishing}
+              className="px-5 py-2 rounded-lg font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 shadow-sm"
+            >
+              {publishing ? '发布中...' : '发布'}
+            </button>
+          )}
+          <Link
+            href="/surveys"
+            className="px-5 py-2 rounded-lg font-semibold border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
+          >
+            取消
           </Link>
-          <span className="text-gray-400">/</span>
-          <span>编辑</span>
         </div>
-        <div className="bg-white rounded-lg shadow p-4 mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">问卷标题</label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="w-full border rounded px-3 py-2"
-          />
-          <label className="block text-sm font-medium text-gray-700 mt-2 mb-1">问卷说明</label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full border rounded px-3 py-2"
-            rows={2}
-          />
-          <div className="mt-3 flex gap-2">
+      </div>
+      <div className="flex gap-6">
+        <div className="w-56 bg-white rounded-lg shadow-card p-4">
+          <div className="text-sm font-medium text-gray-700 mb-3">题目列表</div>
+          {survey.questions?.map((q, i) => (
             <button
+              key={q.id}
               type="button"
-              onClick={handleSaveBasic}
-              disabled={saving}
-              className="bg-gray-200 px-4 py-2 rounded hover:bg-gray-300 disabled:opacity-50"
+              onClick={() => setSelectedId(q.id ?? null)}
+              className={
+                'w-full text-left px-3 py-2 rounded-lg mb-1 text-sm ' +
+                (selectedId === q.id ? 'bg-blue-50 text-blue-700 font-medium' : 'hover:bg-gray-50 text-gray-700')
+              }
             >
-              {saving ? '保存中...' : isDraft ? '保存草稿' : '保存'}
+              {i + 1}. {(q.title || '').slice(0, 12)}
+              {(q.title || '').length > 12 ? '…' : ''}
             </button>
-            {isDraft && (
-              <button
-                type="button"
-                onClick={handlePublish}
-                disabled={publishing}
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
-              >
-                {publishing ? '发布中...' : '发布'}
-              </button>
-            )}
-          </div>
+          ))}
+          <button
+            type="button"
+            onClick={handleAddQuestion}
+            className="w-full mt-3 border border-dashed border-gray-300 rounded-lg py-2 text-gray-500 hover:bg-gray-50 text-sm"
+          >
+            <i className="fas fa-plus mr-1" /> 添加题目
+          </button>
         </div>
-        <div className="flex gap-4">
-          <div className="w-56 bg-white rounded-lg shadow p-2">
-            <div className="font-medium text-gray-700 mb-2">题目列表</div>
-            {survey.questions?.map((q, i) => (
-              <button
-                key={q.id}
-                type="button"
-                onClick={() => setSelectedId(q.id ?? null)}
-                className={
-                  'w-full text-left px-2 py-2 rounded mb-1 ' +
-                  (selectedId === q.id ? 'bg-blue-100' : 'hover:bg-gray-100')
-                }
-              >
-                {i + 1}. {(q.title || '').slice(0, 12)}
-                {(q.title || '').length > 12 ? '…' : ''}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={handleAddQuestion}
-              className="w-full mt-2 border border-dashed rounded py-2 text-gray-500 hover:bg-gray-50"
-            >
-              添加题目
-            </button>
-          </div>
-          <div className="flex-1 bg-white rounded-lg shadow p-4">
+        <div className="flex-1 bg-white rounded-lg shadow-card p-6">
             {selected ? (
               <QuestionEditor
                 question={selected}
@@ -244,7 +253,6 @@ export default function EditSurveyPage() {
             ) : (
               <p className="text-gray-500">请选择或添加题目</p>
             )}
-          </div>
         </div>
       </div>
     </div>
@@ -274,30 +282,30 @@ function QuestionEditor({
 
   return (
     <div>
-      <div className="mb-3">
-        <label className="block text-sm font-medium text-gray-700">题目标题</label>
+      <div className="mb-4">
+        <label className={labelClass}>题目标题</label>
         <input
           type="text"
           value={question.title}
           onChange={(e) => onUpdate({ title: e.target.value })}
-          className="w-full border rounded px-3 py-2"
+          className={inputClass}
         />
       </div>
-      <div className="mb-3">
-        <label className="block text-sm font-medium text-gray-700">题目说明（选填）</label>
+      <div className="mb-4">
+        <label className={labelClass}>题目说明（选填）</label>
         <input
           type="text"
           value={question.description ?? ''}
           onChange={(e) => onUpdate({ description: e.target.value || undefined })}
-          className="w-full border rounded px-3 py-2"
+          className={inputClass}
         />
       </div>
-      <div className="mb-3">
-        <label className="block text-sm font-medium text-gray-700">题型</label>
+      <div className="mb-4">
+        <label className={labelClass}>题型</label>
         <select
           value={question.type}
           onChange={(e) => onUpdate({ type: e.target.value })}
-          className="border rounded px-3 py-2"
+          className={inputClass}
         >
           {TYPES.map((t) => (
             <option key={t.value} value={t.value}>
@@ -306,19 +314,20 @@ function QuestionEditor({
           ))}
         </select>
       </div>
-      <div className="mb-3">
-        <label className="inline-flex items-center gap-2">
+      <div className="mb-4">
+        <label className="inline-flex items-center gap-2 text-sm text-gray-600">
           <input
             type="checkbox"
             checked={question.required !== false}
             onChange={(e) => onUpdate({ required: e.target.checked })}
+            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
           必填
         </label>
       </div>
       {(question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE') && (
-        <div className="mb-3">
-          <label className="block text-sm font-medium text-gray-700">选项</label>
+        <div className="mb-4">
+          <label className={labelClass}>选项</label>
           {options.map((opt, i) => (
             <div key={i} className="flex gap-2 mb-2">
               <input
@@ -329,12 +338,12 @@ function QuestionEditor({
                   next[i] = { ...next[i], label: e.target.value }
                   setOptions(next)
                 }}
-                className="flex-1 border rounded px-2 py-1"
+                className={inputClass + ' flex-1'}
               />
               <button
                 type="button"
                 onClick={() => setOptions(options.filter((_, j) => j !== i))}
-                className="text-red-600 text-sm"
+                className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm"
               >
                 删除
               </button>
@@ -343,30 +352,30 @@ function QuestionEditor({
           <button
             type="button"
             onClick={() => setOptions([...options, { sortOrder: options.length, label: `选项${options.length + 1}` }])}
-            className="text-blue-600 text-sm"
+            className="text-blue-600 hover:underline text-sm"
           >
             添加选项
           </button>
           {question.type === 'MULTIPLE_CHOICE' && (
-            <div className="mt-2 flex gap-4">
+            <div className="mt-3 flex gap-4">
               <div>
-                <label className="block text-sm text-gray-700">最少选</label>
+                <label className={labelClass}>最少选</label>
                 <input
                   type="number"
                   min={0}
                   value={getInt(config, 'minChoices', 0)}
                   onChange={(e) => setConfig('minChoices', parseInt(e.target.value, 10) || 0)}
-                  className="border rounded px-2 py-1 w-20"
+                  className={inputClass + ' w-24'}
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-700">最多选（空=不限）</label>
+                <label className={labelClass}>最多选（空=不限）</label>
                 <input
                   type="number"
                   min={1}
                   value={config.maxChoices === undefined || config.maxChoices === null ? '' : Number(config.maxChoices)}
                   onChange={(e) => setConfig('maxChoices', e.target.value === '' ? undefined : parseInt(e.target.value, 10) || 1)}
-                  className="border rounded px-2 py-1 w-20"
+                  className={inputClass + ' w-24'}
                   placeholder="不限"
                 />
               </div>
@@ -375,52 +384,52 @@ function QuestionEditor({
         </div>
       )}
       {(question.type === 'SHORT_TEXT' || question.type === 'LONG_TEXT') && (
-        <div className="mb-3">
-          <label className="block text-sm font-medium text-gray-700">占位提示</label>
+        <div className="mb-4">
+          <label className={labelClass}>占位提示</label>
           <input
             type="text"
             value={(config.placeholder as string) ?? ''}
             onChange={(e) => setConfig('placeholder', e.target.value)}
-            className="w-full border rounded px-2 py-1"
+            className={inputClass}
           />
         </div>
       )}
       {question.type === 'SCALE' && (
-        <div className="mb-3 flex gap-4">
+        <div className="mb-4 grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
-            <label className="block text-sm text-gray-700">最小值</label>
+            <label className={labelClass}>最小值</label>
             <input
               type="number"
               value={(config.scaleMin as number) ?? 1}
               onChange={(e) => setConfig('scaleMin', parseInt(e.target.value, 10) || 1)}
-              className="border rounded px-2 py-1 w-20"
+              className={inputClass}
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-700">最大值</label>
+            <label className={labelClass}>最大值</label>
             <input
               type="number"
               value={(config.scaleMax as number) ?? 5}
               onChange={(e) => setConfig('scaleMax', parseInt(e.target.value, 10) || 5)}
-              className="border rounded px-2 py-1 w-20"
+              className={inputClass}
             />
           </div>
-          <div className="flex-1">
-            <label className="block text-sm text-gray-700">左端点</label>
+          <div>
+            <label className={labelClass}>左端点</label>
             <input
               type="text"
               value={(config.scaleLeftLabel as string) ?? ''}
               onChange={(e) => setConfig('scaleLeftLabel', e.target.value)}
-              className="w-full border rounded px-2 py-1"
+              className={inputClass}
             />
           </div>
-          <div className="flex-1">
-            <label className="block text-sm text-gray-700">右端点</label>
+          <div>
+            <label className={labelClass}>右端点</label>
             <input
               type="text"
               value={(config.scaleRightLabel as string) ?? ''}
               onChange={(e) => setConfig('scaleRightLabel', e.target.value)}
-              className="w-full border rounded px-2 py-1"
+              className={inputClass}
             />
           </div>
         </div>
@@ -428,7 +437,7 @@ function QuestionEditor({
       <button
         type="button"
         onClick={onDelete}
-        className="mt-4 text-red-600 hover:underline text-sm"
+        className="mt-6 px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 text-sm"
       >
         删除此题
       </button>

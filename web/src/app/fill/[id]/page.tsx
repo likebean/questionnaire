@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { fillApi, type FillSurveyVO, type SurveyQuestionVO, type SubmitItemDTO } from '@/services/api'
 
+const inputClass =
+  'block w-full rounded-md border border-gray-300 bg-white text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-2 pl-3'
+
 function parseConfig(c: string | null | undefined): Record<string, unknown> {
   if (!c) return {}
   try {
@@ -106,7 +109,7 @@ export default function FillPage() {
   if (submitted) {
     return (
       <div className="max-w-2xl mx-auto p-6">
-        <div className="bg-white rounded-lg shadow p-8 text-center">
+        <div className="bg-white rounded-lg shadow-card p-8 text-center">
           <h2 className="text-xl font-bold text-gray-800 mb-4">提交成功</h2>
           <p className="text-gray-600 whitespace-pre-wrap">{thankYou}</p>
         </div>
@@ -117,14 +120,14 @@ export default function FillPage() {
 
   return (
     <div className="max-w-2xl mx-auto p-6">
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
+      <div className="bg-white rounded-lg shadow-card p-6 mb-6">
         <h1 className="text-2xl font-bold text-gray-800 mb-2">{meta.title}</h1>
         {meta.description && <p className="text-gray-600 whitespace-pre-wrap">{meta.description}</p>}
       </div>
       <form onSubmit={handleSubmit}>
         <div className="space-y-6">
           {meta.questions?.map((q, i) => (
-            <div key={q.id} className="bg-white rounded-lg shadow p-4">
+            <div key={q.id} className="bg-white rounded-lg shadow-card p-6">
               <div className="font-medium text-gray-800 mb-2">
                 {i + 1}. {q.title}
                 {q.required !== false && <span className="text-red-500"> *</span>}
@@ -137,7 +140,7 @@ export default function FillPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="w-full py-3 rounded-lg font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 shadow-sm"
           >
             {submitting ? '提交中...' : '提交'}
           </button>
@@ -204,7 +207,7 @@ function FillControl({
           value={answer?.textValue ?? ''}
           onChange={(e) => setAnswer({ textValue: e.target.value })}
           placeholder={(config.placeholder as string) ?? ''}
-          className="w-full border rounded px-3 py-2"
+          className={inputClass}
         />
       )
     case 'LONG_TEXT':
@@ -213,7 +216,7 @@ function FillControl({
           value={answer?.textValue ?? ''}
           onChange={(e) => setAnswer({ textValue: e.target.value })}
           placeholder={(config.placeholder as string) ?? ''}
-          className="w-full border rounded px-3 py-2"
+          className={inputClass}
           rows={3}
         />
       )
@@ -249,7 +252,7 @@ function FillControl({
           type="text"
           value={answer?.textValue ?? ''}
           onChange={(e) => setAnswer({ textValue: e.target.value })}
-          className="w-full border rounded px-3 py-2"
+          className={inputClass}
         />
       )
   }
