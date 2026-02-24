@@ -82,9 +82,12 @@ export default function AccountsPage() {
     }
   }
 
-  const total = data?.total ?? 0
   const items = data?.items ?? []
-  const totalPages = !userIdParam && data && 'pageSize' in data ? Math.ceil(total / pageSize) : 0
+  const effectiveTotal =
+    !userIdParam && data && typeof data.total === 'number' && data.total > 0
+      ? data.total
+      : items.length
+  const totalPages = !userIdParam && data ? Math.ceil(effectiveTotal / pageSize) || 0 : 0
   const pageButtons = Array.from({ length: totalPages }, (_, i) => i + 1)
 
   return (
@@ -220,14 +223,22 @@ export default function AccountsPage() {
         </div>
       </div>
 
-      {data && total > 0 && !userIdParam && (
+      {data !== null && !userIdParam && (
         <div className="mt-4 flex justify-between items-center">
           <div className="text-sm text-gray-600">
             显示 {(page - 1) * pageSize + 1} 至{' '}
-            {Math.min(page * pageSize, total)} 条，共 {total} 条记录
+            {Math.min(page * pageSize, effectiveTotal)} 条，共 {effectiveTotal} 条记录
           </div>
           {totalPages > 1 && (
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-50"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                上一页
+              </button>
               {pageButtons.map((p) => (
                 <button
                   key={p}
@@ -242,6 +253,14 @@ export default function AccountsPage() {
                   {p}
                 </button>
               ))}
+              <button
+                type="button"
+                className="rounded-lg border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-50"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                下一页
+              </button>
             </div>
           )}
         </div>

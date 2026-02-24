@@ -18,6 +18,17 @@ test.describe('问卷流程', () => {
     await expect(page).toHaveURL('/', { timeout: 15000 })
   })
 
+  test('我的问卷列表分页：每页最多 20 条，显示分页信息', async ({ page }) => {
+    await page.getByRole('link', { name: '我的问卷', exact: true }).click()
+    await expect(page).toHaveURL('/surveys', { timeout: 10000 })
+    await expect(page.getByRole('heading', { name: '我的问卷' })).toBeVisible()
+    const footer = page.getByText(/显示 \d+ 至 \d+ 条，共 \d+ 条记录/)
+    await expect(footer).toBeVisible({ timeout: 15000 })
+    const dataRows = page.locator('table tbody tr').filter({ hasNot: page.getByText('暂无问卷') }).filter({ hasNot: page.getByText('加载中') })
+    const count = await dataRows.count()
+    expect(count).toBeLessThanOrEqual(20)
+  })
+
   test('我的问卷列表 → 创建问卷 → 进入编辑页', async ({ page }) => {
     await page.getByRole('link', { name: '我的问卷', exact: true }).click()
     await expect(page).toHaveURL('/surveys', { timeout: 10000 })
