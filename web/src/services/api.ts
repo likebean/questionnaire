@@ -276,7 +276,7 @@ export interface UpdateSettingsDTO {
 }
 
 export const surveysApi = {
-  list: (params?: { status?: string; keyword?: string; page?: number; pageSize?: number; sort?: string }) =>
+  list: (params?: { onlyMine?: boolean; status?: string; keyword?: string; page?: number; pageSize?: number; sort?: string }) =>
     apiClient.get('/surveys', { params }) as Promise<ApiResponse<SurveyListResponse>>,
   create: (data: { title?: string; description?: string }) =>
     apiClient.post('/surveys', data) as Promise<ApiResponse<{ id: string }>>,

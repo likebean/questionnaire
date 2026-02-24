@@ -60,7 +60,7 @@ export default function AnalyticsPage() {
         const url = URL.createObjectURL(blob as Blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `responses-${id}.csv`
+        a.download = `responses-${id}.xlsx`
         a.click()
         URL.revokeObjectURL(url)
       })
@@ -79,7 +79,7 @@ export default function AnalyticsPage() {
           disabled={exporting}
           className="px-5 py-2 rounded-lg font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 shadow-sm"
         >
-          {exporting ? '导出中...' : '导出 CSV'}
+          {exporting ? '导出中...' : '导出 Excel'}
         </button>
       </div>
       <div className="mb-4 flex gap-2 items-center text-sm text-gray-600">

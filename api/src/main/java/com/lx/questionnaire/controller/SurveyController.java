@@ -24,13 +24,14 @@ public class SurveyController {
 
     @GetMapping
     public Result<SurveyListResponse> list(
+            @RequestParam(required = false) Boolean onlyMine,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam(defaultValue = "updatedAt") String sort) {
         String userId = SecurityUtils.getCurrentUserId();
-        return Result.ok(surveyService.list(userId, status, keyword, page, pageSize, sort));
+        return Result.ok(surveyService.list(userId, onlyMine, status, keyword, page, pageSize, sort));
     }
 
     @PostMapping
@@ -172,13 +173,13 @@ public class SurveyController {
         return Result.ok(surveyService.getAnalytics(id, userId));
     }
 
-    @GetMapping(value = "/{id}/export", produces = "text/csv; charset=UTF-8")
+    @GetMapping(value = "/{id}/export", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     public ResponseEntity<byte[]> exportResponses(@PathVariable String id) {
         String userId = SecurityUtils.getCurrentUserId();
         byte[] body = surveyService.exportResponses(id, userId);
         HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.parseMediaType("text/csv; charset=UTF-8"));
-        headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"responses-" + id + ".csv\"");
+        headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"responses-" + id + ".xlsx\"");
         return ResponseEntity.ok().headers(headers).body(body);
     }
 }

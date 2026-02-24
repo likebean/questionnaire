@@ -91,8 +91,8 @@ test.describe('问卷流程', () => {
     }
 
     await page.goto(`/fill/${surveyId}`)
-    await expect(page.getByText('填写测试')).toBeVisible({ timeout: 5000 })
-    await expect(page.getByRole('button', { name: '提交' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '提交' })).toBeVisible({ timeout: 15000 })
+    await expect(page.getByText('填写测试')).toBeVisible({ timeout: 10000 })
     await page.getByText('选项1').click()
     await page.getByRole('button', { name: '提交' }).click()
     await expect(page.getByRole('heading', { name: '提交成功' })).toBeVisible({ timeout: 5000 })

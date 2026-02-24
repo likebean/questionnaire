@@ -118,6 +118,7 @@ export default function MySurveysPage() {
   const router = useRouter()
   const [data, setData] = useState<SurveyListResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [onlyMine, setOnlyMine] = useState(true)
   const [status, setStatus] = useState<string>('')
   const [keyword, setKeyword] = useState('')
   const [sort, setSort] = useState('updatedAt')
@@ -130,7 +131,7 @@ export default function MySurveysPage() {
   const load = () => {
     setLoading(true)
     surveysApi
-      .list({ status: status || undefined, keyword: keyword || undefined, page, pageSize, sort })
+      .list({ onlyMine, status: status || undefined, keyword: keyword || undefined, page, pageSize, sort })
       .then((res: ApiResponse<SurveyListResponse>) => {
         if (res?.data) setData(res.data)
       })
@@ -140,7 +141,7 @@ export default function MySurveysPage() {
 
   useEffect(() => {
     load()
-  }, [page, status, sort])
+  }, [page, status, sort, onlyMine])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -205,6 +206,20 @@ export default function MySurveysPage() {
 
       <div className="mb-6 bg-white rounded-lg shadow-card p-4">
         <form onSubmit={handleSearch} className="flex flex-wrap items-center gap-4">
+          <div className="flex items-end gap-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={onlyMine}
+                onChange={(e) => {
+                  setOnlyMine(e.target.checked)
+                  setPage(1)
+                }}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm font-medium text-gray-700">仅我创建的</span>
+            </label>
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">状态</label>
             <select

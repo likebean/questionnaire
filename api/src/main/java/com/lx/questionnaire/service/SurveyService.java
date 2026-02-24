@@ -8,7 +8,7 @@ import java.util.List;
 
 public interface SurveyService {
 
-    SurveyListResponse list(String creatorId, String status, String keyword, int page, int pageSize, String sort);
+    SurveyListResponse list(String currentUserId, Boolean onlyMine, String status, String keyword, int page, int pageSize, String sort);
 
     Survey create(String creatorId, String title, String description);
 

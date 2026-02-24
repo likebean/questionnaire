@@ -14,14 +14,19 @@ import com.lx.questionnaire.mapper.ResponseItemMapper;
 import com.lx.questionnaire.mapper.ResponseMapper;
 import com.lx.questionnaire.mapper.SurveyMapper;
 import com.lx.questionnaire.mapper.SurveyQuestionMapper;
+import com.lx.questionnaire.mapper.UserMapper;
+import com.lx.questionnaire.service.SurveyPermissionService;
 import com.lx.questionnaire.service.SurveyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
 import java.io.ByteArrayOutputStream;
-import java.io.OutputStreamWriter;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -41,13 +46,9 @@ public class SurveyServiceImpl implements SurveyService {
     private final SurveyQuestionMapper surveyQuestionMapper;
     private final ResponseMapper responseMapper;
     private final ResponseItemMapper responseItemMapper;
+    private final UserMapper userMapper;
+    private final SurveyPermissionService surveyPermissionService;
     private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
-
-    private void requireCreator(Survey s, String currentUserId) {
-        if (currentUserId == null || !currentUserId.equals(s.getCreatorId())) {
-            throw new BusinessException(ErrorCode.FORBIDDEN);
-        }
-    }
 
     private Survey requireSurvey(String id) {
         Survey s = surveyMapper.selectById(id);
@@ -58,9 +59,24 @@ public class SurveyServiceImpl implements SurveyService {
     }
 
     @Override
-    public SurveyListResponse list(String creatorId, String status, String keyword, int page, int pageSize, String sort) {
+    public SurveyListResponse list(String currentUserId, Boolean onlyMine, String status, String keyword, int page, int pageSize, String sort) {
         LambdaQueryWrapper<Survey> q = new LambdaQueryWrapper<>();
-        q.eq(Survey::getCreatorId, creatorId);
+        if (Boolean.TRUE.equals(onlyMine)) {
+            q.eq(Survey::getCreatorId, currentUserId);
+        } else {
+            SurveyListFilter filter = surveyPermissionService.getSurveyViewListFilter(currentUserId);
+            if (filter.isAllowAll()) {
+                // 全校，不限制
+            } else if (!filter.isAllowAll() && filter.getCreatorId() == null && filter.getDepartmentId() == null) {
+                return new SurveyListResponse(List.of(), 0L);
+            } else if (filter.getCreatorId() != null && filter.getDepartmentId() != null) {
+                q.and(w -> w.eq(Survey::getCreatorId, filter.getCreatorId()).or().eq(Survey::getDepartmentId, filter.getDepartmentId()));
+            } else if (filter.getCreatorId() != null) {
+                q.eq(Survey::getCreatorId, filter.getCreatorId());
+            } else {
+                q.eq(Survey::getDepartmentId, filter.getDepartmentId());
+            }
+        }
         if (status != null && !status.isEmpty() && !"all".equalsIgnoreCase(status)) {
             q.eq(Survey::getStatus, status);
         }
@@ -90,12 +106,15 @@ public class SurveyServiceImpl implements SurveyService {
     @Override
     @Transactional
     public Survey create(String creatorId, String title, String description) {
+        surveyPermissionService.requirePermission(creatorId, "survey", null, "create");
         Survey s = new Survey();
         s.setId(UUID.randomUUID().toString());
         s.setTitle(title != null ? title : "未命名问卷");
         s.setDescription(description);
         s.setStatus(STATUS_DRAFT);
         s.setCreatorId(creatorId);
+        com.lx.questionnaire.entity.User creator = userMapper.selectById(creatorId);
+        s.setDepartmentId(creator != null ? creator.getDepartmentId() : null);
         s.setLimitOncePerUser(true);
         s.setAllowAnonymous(false);
         surveyMapper.insert(s);
@@ -105,7 +124,7 @@ public class SurveyServiceImpl implements SurveyService {
     @Override
     public SurveyDetailVO getDetail(String id, String currentUserId) {
         Survey s = requireSurvey(id);
-        requireCreator(s, currentUserId);
+        surveyPermissionService.requirePermission(currentUserId, "survey", s, "view");
         List<SurveyQuestion> questions = surveyQuestionMapper.selectList(
                 new LambdaQueryWrapper<SurveyQuestion>().eq(SurveyQuestion::getSurveyId, id).orderByAsc(SurveyQuestion::getSortOrder));
         return SurveyDetailVO.from(s, questions);
@@ -114,7 +133,7 @@ public class SurveyServiceImpl implements SurveyService {
     @Override
     public void updateBasic(String id, String currentUserId, String title, String description) {
         Survey s = requireSurvey(id);
-        requireCreator(s, currentUserId);
+        surveyPermissionService.requirePermission(currentUserId, "survey", s, "edit");
         if (title != null) s.setTitle(title);
         if (description != null) s.setDescription(description);
         surveyMapper.updateById(s);
@@ -124,7 +143,7 @@ public class SurveyServiceImpl implements SurveyService {
     public void updateSettings(String id, String currentUserId, Boolean limitOncePerUser, Boolean allowAnonymous,
                                LocalDateTime startTime, LocalDateTime endTime, String thankYouText) {
         Survey s = requireSurvey(id);
-        requireCreator(s, currentUserId);
+        surveyPermissionService.requirePermission(currentUserId, "survey", s, "edit");
         if (limitOncePerUser != null) s.setLimitOncePerUser(limitOncePerUser);
         if (allowAnonymous != null) s.setAllowAnonymous(allowAnonymous);
         if (startTime != null) s.setStartTime(startTime);
@@ -137,7 +156,7 @@ public class SurveyServiceImpl implements SurveyService {
     @Transactional
     public void publish(String id, String currentUserId) {
         Survey s = requireSurvey(id);
-        requireCreator(s, currentUserId);
+        surveyPermissionService.requirePermission(currentUserId, "survey", s, "publish");
         if (!STATUS_DRAFT.equals(s.getStatus())) {
             throw new BusinessException(ErrorCode.PARAM_ERROR);
         }
@@ -173,7 +192,7 @@ public class SurveyServiceImpl implements SurveyService {
     @Override
     public void pause(String id, String currentUserId) {
         Survey s = requireSurvey(id);
-        requireCreator(s, currentUserId);
+        surveyPermissionService.requirePermission(currentUserId, "survey", s, "publish");
         if (!STATUS_COLLECTING.equals(s.getStatus())) throw new BusinessException(ErrorCode.PARAM_ERROR);
         s.setStatus(STATUS_PAUSED);
         surveyMapper.updateById(s);
@@ -182,7 +201,7 @@ public class SurveyServiceImpl implements SurveyService {
     @Override
     public void resume(String id, String currentUserId) {
         Survey s = requireSurvey(id);
-        requireCreator(s, currentUserId);
+        surveyPermissionService.requirePermission(currentUserId, "survey", s, "publish");
         if (!STATUS_PAUSED.equals(s.getStatus())) throw new BusinessException(ErrorCode.PARAM_ERROR);
         s.setStatus(STATUS_COLLECTING);
         surveyMapper.updateById(s);
@@ -191,7 +210,7 @@ public class SurveyServiceImpl implements SurveyService {
     @Override
     public void end(String id, String currentUserId) {
         Survey s = requireSurvey(id);
-        requireCreator(s, currentUserId);
+        surveyPermissionService.requirePermission(currentUserId, "survey", s, "publish");
         if (STATUS_ENDED.equals(s.getStatus())) return;
         s.setStatus(STATUS_ENDED);
         surveyMapper.updateById(s);
@@ -201,7 +220,7 @@ public class SurveyServiceImpl implements SurveyService {
     @Transactional
     public Survey copy(String id, String currentUserId) {
         Survey s = requireSurvey(id);
-        requireCreator(s, currentUserId);
+        surveyPermissionService.requirePermission(currentUserId, "survey", s, "view");
         Survey copy = new Survey();
         copy.setId(UUID.randomUUID().toString());
         copy.setTitle(s.getTitle() + " (副本)");
@@ -233,7 +252,7 @@ public class SurveyServiceImpl implements SurveyService {
     @Override
     public void delete(String id, String currentUserId) {
         Survey s = requireSurvey(id);
-        requireCreator(s, currentUserId);
+        surveyPermissionService.requirePermission(currentUserId, "survey", s, "delete");
         surveyMapper.deleteById(id);
     }
 
@@ -246,7 +265,7 @@ public class SurveyServiceImpl implements SurveyService {
     @Override
     public List<SurveyQuestion> listQuestions(String surveyId, String currentUserId) {
         Survey s = requireSurvey(surveyId);
-        requireCreator(s, currentUserId);
+        surveyPermissionService.requirePermission(currentUserId, "survey", s, "edit");
         return surveyQuestionMapper.selectList(
                 new LambdaQueryWrapper<SurveyQuestion>().eq(SurveyQuestion::getSurveyId, surveyId).orderByAsc(SurveyQuestion::getSortOrder));
     }
@@ -254,7 +273,7 @@ public class SurveyServiceImpl implements SurveyService {
     @Override
     public SurveyQuestion addQuestion(String surveyId, String currentUserId, SurveyQuestion question) {
         Survey s = requireSurvey(surveyId);
-        requireCreator(s, currentUserId);
+        surveyPermissionService.requirePermission(currentUserId, "survey", s, "edit");
         question.setSurveyId(surveyId);
         if (question.getSortOrder() == null) {
             Integer maxOrder = surveyQuestionMapper.selectList(
@@ -269,7 +288,7 @@ public class SurveyServiceImpl implements SurveyService {
     @Override
     public void updateQuestion(String surveyId, Long questionId, String currentUserId, SurveyQuestion question) {
         Survey s = requireSurvey(surveyId);
-        requireCreator(s, currentUserId);
+        surveyPermissionService.requirePermission(currentUserId, "survey", s, "edit");
         SurveyQuestion existing = surveyQuestionMapper.selectOne(
                 new LambdaQueryWrapper<SurveyQuestion>().eq(SurveyQuestion::getSurveyId, surveyId).eq(SurveyQuestion::getId, questionId));
         if (existing == null) throw new BusinessException(ErrorCode.NOT_FOUND);
@@ -284,7 +303,7 @@ public class SurveyServiceImpl implements SurveyService {
     @Override
     public void updateQuestionOrder(String surveyId, String currentUserId, List<Long> questionIds) {
         Survey s = requireSurvey(surveyId);
-        requireCreator(s, currentUserId);
+        surveyPermissionService.requirePermission(currentUserId, "survey", s, "edit");
         for (int i = 0; i < questionIds.size(); i++) {
             SurveyQuestion q = surveyQuestionMapper.selectById(questionIds.get(i));
             if (q != null && q.getSurveyId().equals(surveyId)) {
@@ -298,7 +317,7 @@ public class SurveyServiceImpl implements SurveyService {
     @Transactional
     public SurveyQuestion copyQuestion(String surveyId, Long questionId, String currentUserId) {
         Survey s = requireSurvey(surveyId);
-        requireCreator(s, currentUserId);
+        surveyPermissionService.requirePermission(currentUserId, "survey", s, "edit");
         SurveyQuestion src = surveyQuestionMapper.selectOne(
                 new LambdaQueryWrapper<SurveyQuestion>().eq(SurveyQuestion::getSurveyId, surveyId).eq(SurveyQuestion::getId, questionId));
         if (src == null) throw new BusinessException(ErrorCode.NOT_FOUND);
@@ -324,7 +343,7 @@ public class SurveyServiceImpl implements SurveyService {
     @Override
     public void deleteQuestion(String surveyId, Long questionId, String currentUserId) {
         Survey s = requireSurvey(surveyId);
-        requireCreator(s, currentUserId);
+        surveyPermissionService.requirePermission(currentUserId, "survey", s, "edit");
         surveyQuestionMapper.delete(new LambdaQueryWrapper<SurveyQuestion>()
                 .eq(SurveyQuestion::getSurveyId, surveyId).eq(SurveyQuestion::getId, questionId));
     }
@@ -332,7 +351,7 @@ public class SurveyServiceImpl implements SurveyService {
     @Override
     public ResponseListResponse listResponses(String surveyId, String currentUserId, int page, int pageSize) {
         Survey s = requireSurvey(surveyId);
-        requireCreator(s, currentUserId);
+        surveyPermissionService.requirePermission(currentUserId, "response", s, "view");
         Page<Response> p = new Page<>(page, pageSize);
         Page<Response> result = responseMapper.selectPage(p,
                 new LambdaQueryWrapper<Response>().eq(Response::getSurveyId, surveyId).orderByDesc(Response::getSubmittedAt));
@@ -362,7 +381,7 @@ public class SurveyServiceImpl implements SurveyService {
     @Override
     public ResponseDetailVO getResponseDetail(String surveyId, Long responseId, String currentUserId) {
         Survey s = requireSurvey(surveyId);
-        requireCreator(s, currentUserId);
+        surveyPermissionService.requirePermission(currentUserId, "response", s, "view");
         Response r = responseMapper.selectOne(new LambdaQueryWrapper<Response>()
                 .eq(Response::getSurveyId, surveyId).eq(Response::getId, responseId));
         if (r == null) throw new BusinessException(ErrorCode.NOT_FOUND);
@@ -392,7 +411,7 @@ public class SurveyServiceImpl implements SurveyService {
     @Override
     public AnalyticsResponse getAnalytics(String surveyId, String currentUserId) {
         Survey s = requireSurvey(surveyId);
-        requireCreator(s, currentUserId);
+        surveyPermissionService.requirePermission(currentUserId, "response", s, "view");
         List<SurveyQuestion> questions = surveyQuestionMapper.selectList(
                 new LambdaQueryWrapper<SurveyQuestion>().eq(SurveyQuestion::getSurveyId, surveyId).orderByAsc(SurveyQuestion::getSortOrder));
         List<AnalyticsQuestionVO> result = new ArrayList<>();
@@ -422,41 +441,39 @@ public class SurveyServiceImpl implements SurveyService {
     @Override
     public byte[] exportResponses(String surveyId, String currentUserId) {
         Survey s = requireSurvey(surveyId);
-        requireCreator(s, currentUserId);
+        surveyPermissionService.requirePermission(currentUserId, "response", s, "export");
         List<SurveyQuestion> questions = surveyQuestionMapper.selectList(
                 new LambdaQueryWrapper<SurveyQuestion>().eq(SurveyQuestion::getSurveyId, surveyId).orderByAsc(SurveyQuestion::getSortOrder));
         List<Response> responses = responseMapper.selectList(
                 new LambdaQueryWrapper<Response>().eq(Response::getSurveyId, surveyId).orderByAsc(Response::getSubmittedAt));
-        Map<Long, SurveyQuestion> qMap = questions.stream().collect(Collectors.toMap(SurveyQuestion::getId, x -> x));
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        OutputStreamWriter w = new OutputStreamWriter(baos, StandardCharsets.UTF_8);
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-        try {
-            w.write('\uFEFF');
-            w.write("提交时间\t用时(秒)");
-            for (SurveyQuestion q : questions) w.write("\t" + escapeCsv(q.getTitle()));
-            w.write("\n");
+        try (Workbook wb = new XSSFWorkbook()) {
+            Sheet sheet = wb.createSheet("答卷");
+            Row headerRow = sheet.createRow(0);
+            headerRow.createCell(0).setCellValue("提交时间");
+            headerRow.createCell(1).setCellValue("用时(秒)");
+            for (int i = 0; i < questions.size(); i++) {
+                headerRow.createCell(2 + i).setCellValue(questions.get(i).getTitle() != null ? questions.get(i).getTitle() : "");
+            }
+            int rowNum = 1;
             for (Response r : responses) {
                 List<ResponseItem> items = responseItemMapper.selectList(
                         new LambdaQueryWrapper<ResponseItem>().eq(ResponseItem::getResponseId, r.getId()));
-                w.write((r.getSubmittedAt() != null ? r.getSubmittedAt().format(dtf) : "") + "\t" + (r.getDurationSeconds() != null ? r.getDurationSeconds() : ""));
-                for (SurveyQuestion q : questions) {
+                Row row = sheet.createRow(rowNum++);
+                row.createCell(0).setCellValue(r.getSubmittedAt() != null ? r.getSubmittedAt().format(dtf) : "");
+                row.createCell(1).setCellValue(r.getDurationSeconds() != null ? r.getDurationSeconds() : 0);
+                for (int i = 0; i < questions.size(); i++) {
+                    SurveyQuestion q = questions.get(i);
                     ResponseItem item = items.stream().filter(x -> x.getQuestionId().equals(q.getId())).findFirst().orElse(null);
-                    w.write("\t" + escapeCsv(item == null ? "" : formatAnswerShort(item, q)));
+                    row.createCell(2 + i).setCellValue(item == null ? "" : formatAnswerShort(item, q));
                 }
-                w.write("\n");
             }
-            w.flush();
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            wb.write(baos);
+            return baos.toByteArray();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-        return baos.toByteArray();
-    }
-
-    private static String escapeCsv(String s) {
-        if (s == null) return "";
-        if (s.contains("\t") || s.contains("\n") || s.contains("\"")) return "\"" + s.replace("\"", "\"\"") + "\"";
-        return s;
     }
 
     private String formatAnswerShort(ResponseItem item, SurveyQuestion q) {

@@ -16,6 +16,8 @@ public class Survey {
     private String description;
     private String status; // DRAFT, COLLECTING, PAUSED, ENDED
     private String creatorId;
+    /** 问卷归属院系，创建时写入、不跟人走；null 表示无部门/仅本人可见 */
+    private Long departmentId;
     private Boolean limitOncePerUser;
     private Boolean allowAnonymous;
     private LocalDateTime startTime;
