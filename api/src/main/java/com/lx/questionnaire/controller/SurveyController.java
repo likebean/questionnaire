@@ -1,14 +1,15 @@
 package com.lx.questionnaire.controller;
 
 import com.lx.questionnaire.common.Result;
-import com.lx.questionnaire.dto.SurveyDetailVO;
-import com.lx.questionnaire.dto.SurveyListResponse;
-import com.lx.questionnaire.dto.UpdateSettingsDTO;
+import com.lx.questionnaire.dto.*;
 import com.lx.questionnaire.entity.Survey;
 import com.lx.questionnaire.entity.SurveyQuestion;
 import com.lx.questionnaire.service.SurveyService;
 import com.lx.questionnaire.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -147,5 +148,37 @@ public class SurveyController {
         String userId = SecurityUtils.getCurrentUserId();
         surveyService.deleteQuestion(surveyId, questionId, userId);
         return Result.ok();
+    }
+
+    // ---------- 答卷与统计 ----------
+    @GetMapping("/{id}/responses")
+    public Result<ResponseListResponse> listResponses(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int pageSize) {
+        String userId = SecurityUtils.getCurrentUserId();
+        return Result.ok(surveyService.listResponses(id, userId, page, pageSize));
+    }
+
+    @GetMapping("/{surveyId}/responses/{responseId}")
+    public Result<ResponseDetailVO> getResponseDetail(@PathVariable Long surveyId, @PathVariable Long responseId) {
+        String userId = SecurityUtils.getCurrentUserId();
+        return Result.ok(surveyService.getResponseDetail(surveyId, responseId, userId));
+    }
+
+    @GetMapping("/{id}/analytics")
+    public Result<AnalyticsResponse> getAnalytics(@PathVariable Long id) {
+        String userId = SecurityUtils.getCurrentUserId();
+        return Result.ok(surveyService.getAnalytics(id, userId));
+    }
+
+    @GetMapping(value = "/{id}/export", produces = "text/csv; charset=UTF-8")
+    public ResponseEntity<byte[]> exportResponses(@PathVariable Long id) {
+        String userId = SecurityUtils.getCurrentUserId();
+        byte[] body = surveyService.exportResponses(id, userId);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType("text/csv; charset=UTF-8"));
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"responses-" + id + ".csv\"");
+        return ResponseEntity.ok().headers(headers).body(body);
     }
 }

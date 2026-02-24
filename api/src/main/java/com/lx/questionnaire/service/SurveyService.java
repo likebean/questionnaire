@@ -1,6 +1,5 @@
 package com.lx.questionnaire.service;
 
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.lx.questionnaire.dto.*;
 import com.lx.questionnaire.entity.Survey;
 import com.lx.questionnaire.entity.SurveyQuestion;
@@ -45,4 +44,12 @@ public interface SurveyService {
     SurveyQuestion copyQuestion(Long surveyId, Long questionId, String currentUserId);
 
     void deleteQuestion(Long surveyId, Long questionId, String currentUserId);
+
+    ResponseListResponse listResponses(Long surveyId, String currentUserId, int page, int pageSize);
+
+    ResponseDetailVO getResponseDetail(Long surveyId, Long responseId, String currentUserId);
+
+    AnalyticsResponse getAnalytics(Long surveyId, String currentUserId);
+
+    byte[] exportResponses(Long surveyId, String currentUserId);
 }

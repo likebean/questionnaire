@@ -5,6 +5,11 @@ import { test, expect } from '@playwright/test'
 
 test.describe('院系管理', () => {
   test.beforeEach(async ({ page }) => {
+    const health = await page.request.get('http://localhost:8080/api/health').catch(() => null)
+    if (!health || health.status() !== 200) {
+      test.skip(true, '后端未启动')
+      return
+    }
     await page.goto('/auth/login')
     await page.getByLabel(/用户名/).fill('admin')
     await page.getByLabel(/密码/).fill('admin123')

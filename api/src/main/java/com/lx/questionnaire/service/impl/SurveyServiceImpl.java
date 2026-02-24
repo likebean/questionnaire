@@ -7,6 +7,10 @@ import com.lx.questionnaire.common.ErrorCode;
 import com.lx.questionnaire.dto.*;
 import com.lx.questionnaire.entity.Survey;
 import com.lx.questionnaire.entity.SurveyQuestion;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.lx.questionnaire.entity.Response;
+import com.lx.questionnaire.entity.ResponseItem;
+import com.lx.questionnaire.mapper.ResponseItemMapper;
 import com.lx.questionnaire.mapper.ResponseMapper;
 import com.lx.questionnaire.mapper.SurveyMapper;
 import com.lx.questionnaire.mapper.SurveyQuestionMapper;
@@ -15,9 +19,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -32,6 +39,8 @@ public class SurveyServiceImpl implements SurveyService {
     private final SurveyMapper surveyMapper;
     private final SurveyQuestionMapper surveyQuestionMapper;
     private final ResponseMapper responseMapper;
+    private final ResponseItemMapper responseItemMapper;
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
 
     private void requireCreator(Survey s, String currentUserId) {
         if (currentUserId == null || !currentUserId.equals(s.getCreatorId())) {
@@ -130,9 +139,30 @@ public class SurveyServiceImpl implements SurveyService {
         if (!STATUS_DRAFT.equals(s.getStatus())) {
             throw new BusinessException(ErrorCode.PARAM_ERROR);
         }
-        long count = surveyQuestionMapper.selectCount(new LambdaQueryWrapper<SurveyQuestion>().eq(SurveyQuestion::getSurveyId, id));
-        if (count == 0) {
+        List<SurveyQuestion> questions = surveyQuestionMapper.selectList(
+                new LambdaQueryWrapper<SurveyQuestion>().eq(SurveyQuestion::getSurveyId, id).orderByAsc(SurveyQuestion::getSortOrder));
+        if (questions.isEmpty()) {
             throw new BusinessException(ErrorCode.fail(1002, "请至少添加一道题目"));
+        }
+        for (SurveyQuestion q : questions) {
+            if (q.getTitle() == null || q.getTitle().isBlank()) {
+                throw new BusinessException(ErrorCode.fail(1002, "请填写题目标题（题目" + (q.getSortOrder() + 1) + "）"));
+            }
+            if ("SINGLE_CHOICE".equals(q.getType()) || "MULTIPLE_CHOICE".equals(q.getType())) {
+                if (q.getConfig() == null || !q.getConfig().contains("\"options\"") || !q.getConfig().contains("[")) {
+                    throw new BusinessException(ErrorCode.fail(1002, "单选题/多选题至少需要一个选项（题目：" + q.getTitle() + "）"));
+                }
+                try {
+                    com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(q.getConfig());
+                    com.fasterxml.jackson.databind.JsonNode opts = node.get("options");
+                    if (opts == null || !opts.isArray() || opts.size() == 0) {
+                        throw new BusinessException(ErrorCode.fail(1002, "单选题/多选题至少需要一个选项（题目：" + q.getTitle() + "）"));
+                    }
+                } catch (Exception e) {
+                    if (e instanceof BusinessException) throw (BusinessException) e;
+                    throw new BusinessException(ErrorCode.fail(1002, "题目配置无效（题目：" + q.getTitle() + "）"));
+                }
+            }
         }
         s.setStatus(STATUS_COLLECTING);
         surveyMapper.updateById(s);
@@ -294,5 +324,225 @@ public class SurveyServiceImpl implements SurveyService {
         requireCreator(s, currentUserId);
         surveyQuestionMapper.delete(new LambdaQueryWrapper<SurveyQuestion>()
                 .eq(SurveyQuestion::getSurveyId, surveyId).eq(SurveyQuestion::getId, questionId));
+    }
+
+    @Override
+    public ResponseListResponse listResponses(Long surveyId, String currentUserId, int page, int pageSize) {
+        Survey s = requireSurvey(surveyId);
+        requireCreator(s, currentUserId);
+        Page<Response> p = new Page<>(page, pageSize);
+        Page<Response> result = responseMapper.selectPage(p,
+                new LambdaQueryWrapper<Response>().eq(Response::getSurveyId, surveyId).orderByDesc(Response::getSubmittedAt));
+        List<SurveyQuestion> questions = surveyQuestionMapper.selectList(
+                new LambdaQueryWrapper<SurveyQuestion>().eq(SurveyQuestion::getSurveyId, surveyId).orderByAsc(SurveyQuestion::getSortOrder));
+        Map<Long, SurveyQuestion> qMap = questions.stream().collect(Collectors.toMap(SurveyQuestion::getId, x -> x));
+        List<ResponseListItemVO> list = new ArrayList<>();
+        for (Response r : result.getRecords()) {
+            ResponseListItemVO vo = new ResponseListItemVO();
+            vo.setId(r.getId());
+            vo.setSubmittedAt(r.getSubmittedAt());
+            vo.setDurationSeconds(r.getDurationSeconds());
+            List<ResponseItem> items = responseItemMapper.selectList(
+                    new LambdaQueryWrapper<ResponseItem>().eq(ResponseItem::getResponseId, r.getId()));
+            List<String> parts = new ArrayList<>();
+            for (int i = 0; i < Math.min(2, questions.size()); i++) {
+                SurveyQuestion q = questions.get(i);
+                ResponseItem item = items.stream().filter(x -> x.getQuestionId().equals(q.getId())).findFirst().orElse(null);
+                if (item != null) parts.add(formatAnswerShort(item, q));
+            }
+            vo.setSummary(parts.isEmpty() ? null : String.join("；", parts));
+            list.add(vo);
+        }
+        return new ResponseListResponse(list, result.getTotal());
+    }
+
+    @Override
+    public ResponseDetailVO getResponseDetail(Long surveyId, Long responseId, String currentUserId) {
+        Survey s = requireSurvey(surveyId);
+        requireCreator(s, currentUserId);
+        Response r = responseMapper.selectOne(new LambdaQueryWrapper<Response>()
+                .eq(Response::getSurveyId, surveyId).eq(Response::getId, responseId));
+        if (r == null) throw new BusinessException(ErrorCode.NOT_FOUND);
+        List<SurveyQuestion> questions = surveyQuestionMapper.selectList(
+                new LambdaQueryWrapper<SurveyQuestion>().eq(SurveyQuestion::getSurveyId, surveyId).orderByAsc(SurveyQuestion::getSortOrder));
+        Map<Long, SurveyQuestion> qMap = questions.stream().collect(Collectors.toMap(SurveyQuestion::getId, x -> x));
+        List<ResponseItem> items = responseItemMapper.selectList(
+                new LambdaQueryWrapper<ResponseItem>().eq(ResponseItem::getResponseId, responseId));
+        ResponseDetailVO vo = new ResponseDetailVO();
+        vo.setId(r.getId());
+        vo.setSubmittedAt(r.getSubmittedAt());
+        vo.setDurationSeconds(r.getDurationSeconds());
+        List<ResponseDetailItemVO> detailItems = new ArrayList<>();
+        for (SurveyQuestion q : questions) {
+            ResponseDetailItemVO di = new ResponseDetailItemVO();
+            di.setQuestionId(q.getId());
+            di.setQuestionTitle(q.getTitle());
+            di.setType(q.getType());
+            ResponseItem item = items.stream().filter(x -> x.getQuestionId().equals(q.getId())).findFirst().orElse(null);
+            di.setAnswerText(item == null ? "—" : formatAnswerShort(item, q));
+            detailItems.add(di);
+        }
+        vo.setItems(detailItems);
+        return vo;
+    }
+
+    @Override
+    public AnalyticsResponse getAnalytics(Long surveyId, String currentUserId) {
+        Survey s = requireSurvey(surveyId);
+        requireCreator(s, currentUserId);
+        List<SurveyQuestion> questions = surveyQuestionMapper.selectList(
+                new LambdaQueryWrapper<SurveyQuestion>().eq(SurveyQuestion::getSurveyId, surveyId).orderByAsc(SurveyQuestion::getSortOrder));
+        List<AnalyticsQuestionVO> result = new ArrayList<>();
+        for (SurveyQuestion q : questions) {
+            AnalyticsQuestionVO aq = new AnalyticsQuestionVO();
+            aq.setQuestionId(q.getId());
+            aq.setType(q.getType());
+            aq.setTitle(q.getTitle());
+            List<ResponseItem> items = responseItemMapper.selectList(
+                    new LambdaQueryWrapper<ResponseItem>().eq(ResponseItem::getQuestionId, q.getId()));
+            if (items.isEmpty()) {
+                if ("SINGLE_CHOICE".equals(q.getType()) || "MULTIPLE_CHOICE".equals(q.getType())) aq.setSummary(new ArrayList<AnalyticsOptionSummary>());
+                else if ("SCALE".equals(q.getType())) aq.setSummary(new com.lx.questionnaire.dto.AnalyticsScaleSummary());
+                else aq.setSummary(new ArrayList<String>());
+            } else if ("SINGLE_CHOICE".equals(q.getType()) || "MULTIPLE_CHOICE".equals(q.getType())) {
+                aq.setSummary(buildOptionSummary(q, items));
+            } else if ("SCALE".equals(q.getType())) {
+                aq.setSummary(buildScaleSummary(items));
+            } else {
+                aq.setSummary(items.stream().map(ResponseItem::getTextValue).filter(Objects::nonNull).collect(Collectors.toList()));
+            }
+            result.add(aq);
+        }
+        return new AnalyticsResponse(result);
+    }
+
+    @Override
+    public byte[] exportResponses(Long surveyId, String currentUserId) {
+        Survey s = requireSurvey(surveyId);
+        requireCreator(s, currentUserId);
+        List<SurveyQuestion> questions = surveyQuestionMapper.selectList(
+                new LambdaQueryWrapper<SurveyQuestion>().eq(SurveyQuestion::getSurveyId, surveyId).orderByAsc(SurveyQuestion::getSortOrder));
+        List<Response> responses = responseMapper.selectList(
+                new LambdaQueryWrapper<Response>().eq(Response::getSurveyId, surveyId).orderByAsc(Response::getSubmittedAt));
+        Map<Long, SurveyQuestion> qMap = questions.stream().collect(Collectors.toMap(SurveyQuestion::getId, x -> x));
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        OutputStreamWriter w = new OutputStreamWriter(baos, StandardCharsets.UTF_8);
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        try {
+            w.write('\uFEFF');
+            w.write("提交时间\t用时(秒)");
+            for (SurveyQuestion q : questions) w.write("\t" + escapeCsv(q.getTitle()));
+            w.write("\n");
+            for (Response r : responses) {
+                List<ResponseItem> items = responseItemMapper.selectList(
+                        new LambdaQueryWrapper<ResponseItem>().eq(ResponseItem::getResponseId, r.getId()));
+                w.write((r.getSubmittedAt() != null ? r.getSubmittedAt().format(dtf) : "") + "\t" + (r.getDurationSeconds() != null ? r.getDurationSeconds() : ""));
+                for (SurveyQuestion q : questions) {
+                    ResponseItem item = items.stream().filter(x -> x.getQuestionId().equals(q.getId())).findFirst().orElse(null);
+                    w.write("\t" + escapeCsv(item == null ? "" : formatAnswerShort(item, q)));
+                }
+                w.write("\n");
+            }
+            w.flush();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return baos.toByteArray();
+    }
+
+    private static String escapeCsv(String s) {
+        if (s == null) return "";
+        if (s.contains("\t") || s.contains("\n") || s.contains("\"")) return "\"" + s.replace("\"", "\"\"") + "\"";
+        return s;
+    }
+
+    private String formatAnswerShort(ResponseItem item, SurveyQuestion q) {
+        if (item.getValueType() == null) return "";
+        switch (item.getValueType()) {
+            case "OPTION":
+                if (item.getOptionIndex() != null) return getOptionLabel(q, item.getOptionIndex());
+                if (item.getOptionIndices() != null && !item.getOptionIndices().isEmpty()) {
+                    try {
+                        JsonNode arr = JSON.readTree(item.getOptionIndices());
+                        StringBuilder sb = new StringBuilder();
+                        for (JsonNode n : arr) {
+                            int idx = n.asInt();
+                            if (sb.length() > 0) sb.append("、");
+                            sb.append(getOptionLabel(q, idx));
+                        }
+                        return sb.toString();
+                    } catch (Exception ignored) { }
+                }
+                return "";
+            case "TEXT": return item.getTextValue() != null ? item.getTextValue() : "";
+            case "SCALE": return item.getScaleValue() != null ? String.valueOf(item.getScaleValue()) : "";
+            default: return "";
+        }
+    }
+
+    private String getOptionLabel(SurveyQuestion q, int index) {
+        if (q.getConfig() == null) return "选项" + index;
+        try {
+            JsonNode node = JSON.readTree(q.getConfig());
+            JsonNode opts = node.get("options");
+            if (opts != null && opts.isArray() && index >= 0 && index < opts.size()) {
+                JsonNode label = opts.get(index).get("label");
+                return label != null ? label.asText() : "选项" + index;
+            }
+        } catch (Exception ignored) { }
+        return "选项" + index;
+    }
+
+    private List<AnalyticsOptionSummary> buildOptionSummary(SurveyQuestion q, List<ResponseItem> items) {
+        List<int[]> indices = new ArrayList<>();
+        for (ResponseItem ri : items) {
+            if (ri.getOptionIndex() != null) indices.add(new int[]{ri.getOptionIndex()});
+            else if (ri.getOptionIndices() != null && !ri.getOptionIndices().isEmpty()) {
+                try {
+                    JsonNode arr = JSON.readTree(ri.getOptionIndices());
+                    int[] a = new int[arr.size()];
+                    for (int i = 0; i < arr.size(); i++) a[i] = arr.get(i).asInt();
+                    indices.add(a);
+                } catch (Exception ignored) { }
+            }
+        }
+        int optionCount = 0;
+        try {
+            if (q.getConfig() != null) {
+                JsonNode node = JSON.readTree(q.getConfig());
+                if (node.get("options") != null && node.get("options").isArray()) optionCount = node.get("options").size();
+            }
+        } catch (Exception ignored) { }
+        int totalResponses = indices.size();
+        List<AnalyticsOptionSummary> list = new ArrayList<>();
+        for (int i = 0; i < optionCount; i++) {
+            final int idx = i;
+            long count = indices.stream().filter(x -> Arrays.stream(x).anyMatch(v -> v == idx)).count();
+            AnalyticsOptionSummary o = new AnalyticsOptionSummary();
+            o.setOptionIndex(idx);
+            o.setLabel(getOptionLabel(q, idx));
+            o.setCount(count);
+            o.setRatio(totalResponses > 0 ? (double) count / totalResponses : 0);
+            list.add(o);
+        }
+        return list;
+    }
+
+    private AnalyticsScaleSummary buildScaleSummary(List<ResponseItem> items) {
+        List<Integer> values = items.stream().map(ResponseItem::getScaleValue).filter(Objects::nonNull).collect(Collectors.toList());
+        double avg = values.isEmpty() ? 0 : values.stream().mapToInt(Integer::intValue).average().orElse(0);
+        Map<Integer, Long> dist = values.stream().collect(Collectors.groupingBy(x -> x, Collectors.counting()));
+        AnalyticsScaleSummary s = new AnalyticsScaleSummary();
+        s.setAvg(avg);
+        List<AnalyticsScaleSummary.ScaleDistributionItem> distList = new ArrayList<>();
+        for (Map.Entry<Integer, Long> e : dist.entrySet()) {
+            AnalyticsScaleSummary.ScaleDistributionItem d = new AnalyticsScaleSummary.ScaleDistributionItem();
+            d.setValue(e.getKey());
+            d.setCount(e.getValue());
+            distList.add(d);
+        }
+        distList.sort(Comparator.comparingInt(AnalyticsScaleSummary.ScaleDistributionItem::getValue));
+        s.setDistribution(distList);
+        return s;
     }
 }

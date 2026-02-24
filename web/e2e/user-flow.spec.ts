@@ -1,6 +1,6 @@
 /**
  * 完整用户操作 E2E：在真实浏览器中模拟用户从访问到登录、导航的完整流程。
- * 运行前请先启动后端：cd api && ./mvnw spring-boot:run（或 JAVA_HOME=java23 ./mvnw spring-boot:run）
+ * 运行前请先启动后端：cd api && ./mvnw spring-boot:run
  * 前端可由 Playwright 自动启动（webServer），或先 npm run dev。
  */
 import { test, expect } from '@playwright/test'
@@ -9,6 +9,11 @@ test.describe('完整用户流程', () => {
   test('未登录访问首页 → 跳转登录页 → 输入账号密码登录 → 首页 → 进入我的问卷 → 返回首页', async ({
     page,
   }) => {
+    const health = await page.request.get('http://localhost:8080/api/health').catch(() => null)
+    if (!health || health.status() !== 200) {
+      test.skip(true, '后端未启动，跳过依赖 API 的用户流程测试')
+      return
+    }
     // 1. 未登录访问首页，应被重定向到登录页
     await page.goto('/')
     await expect(page).toHaveURL(/\/auth\/login/, { timeout: 10000 })
@@ -30,13 +35,13 @@ test.describe('完整用户流程', () => {
     await expect(page.getByRole('heading', { name: '我的问卷' })).toBeVisible({ timeout: 10000 })
     // 列表可能先显示「加载中」，再显示「暂无问卷」或列表（多元素取其一即可）
     await expect(
-      page.getByText(/当前用户|加载中|暂无问卷|问卷 CRUD/).first()
+      page.getByText(/当前用户|加载中|暂无问卷|创建问卷/).first()
     ).toBeVisible({ timeout: 15000 })
 
-    // 5. 等待列表加载完成（不再显示「加载中」），应看到空状态或当前用户信息
+    // 5. 等待列表加载完成（不再显示「加载中」），应看到空状态或当前用户信息或列表
     await expect(page.getByText('加载中')).not.toBeVisible({ timeout: 15000 })
     await expect(
-      page.getByText(/当前用户|暂无问卷|问卷 CRUD/).first()
+      page.getByText(/当前用户|暂无问卷|创建问卷|问卷标题/).first()
     ).toBeVisible()
 
     // 6. 点击「返回首页」回到首页
@@ -46,6 +51,11 @@ test.describe('完整用户流程', () => {
   })
 
   test('登录页：错误密码时显示错误信息，不跳转', async ({ page }) => {
+    const health = await page.request.get('http://localhost:8080/api/health').catch(() => null)
+    if (!health || health.status() !== 200) {
+      test.skip(true, '后端未启动')
+      return
+    }
     await page.goto('/auth/login')
     await page.getByLabel(/用户名/).fill('admin')
     await page.getByLabel(/密码/).fill('wrong-password')
@@ -56,6 +66,11 @@ test.describe('完整用户流程', () => {
   })
 
   test('已登录访问首页直接看到内容，不进入登录页', async ({ page }) => {
+    const health = await page.request.get('http://localhost:8080/api/health').catch(() => null)
+    if (!health || health.status() !== 200) {
+      test.skip(true, '后端未启动')
+      return
+    }
     // 先登录
     await page.goto('/auth/login')
     await page.getByLabel(/用户名/).fill('admin')

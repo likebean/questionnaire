@@ -12,6 +12,7 @@ public class FillSurveyVO {
     private Long id;
     private String title;
     private String description;
+    private String thankYouText;
     private List<SurveyQuestion> questions;
 
     public static FillSurveyVO from(Survey s, List<SurveyQuestion> questions) {
@@ -19,6 +20,7 @@ public class FillSurveyVO {
         vo.setId(s.getId());
         vo.setTitle(s.getTitle());
         vo.setDescription(s.getDescription());
+        vo.setThankYouText(s.getThankYouText());
         vo.setQuestions(questions);
         return vo;
     }
