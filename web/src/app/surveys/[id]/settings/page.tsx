@@ -15,6 +15,8 @@ export default function SettingsPage() {
   const [survey, setSurvey] = useState<SurveyDetailVO | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
   const [limitOnce, setLimitOnce] = useState(true)
   const [allowAnonymous, setAllowAnonymous] = useState(false)
   const [startTime, setStartTime] = useState('')
@@ -30,6 +32,8 @@ export default function SettingsPage() {
       .then((res: ApiResponse<SurveyDetailVO>) => {
         if (res?.data) {
           setSurvey(res.data)
+          setTitle(res.data.title ?? '')
+          setDescription(res.data.description ?? '')
           setLimitOnce(res.data.limitOncePerUser !== false)
           setAllowAnonymous(res.data.allowAnonymous === true)
           setStartTime(res.data.startTime ? res.data.startTime.slice(0, 16) : '')
@@ -59,9 +63,14 @@ export default function SettingsPage() {
       endTime: endTime ? `${endTime}:00` : null,
       thankYouText: thankYouText || null,
     }
-    surveysApi
-      .updateSettings(id, dto)
-      .then(() => setSaving(false))
+    Promise.all([
+      surveysApi.updateBasic(id, { title, description }),
+      surveysApi.updateSettings(id, dto),
+    ])
+      .then(() => {
+        if (survey) setSurvey({ ...survey, title, description })
+        setSaving(false)
+      })
       .catch(() => setSaving(false))
   }
 
@@ -98,6 +107,29 @@ export default function SettingsPage() {
         <span>设置</span>
       </div>
       <div className="bg-white rounded-lg shadow-card p-8 space-y-6">
+        <div>
+          <label htmlFor="settings-survey-title" className={labelClass}>问卷标题</label>
+          <input
+            id="settings-survey-title"
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className={inputClass}
+            placeholder="未命名问卷"
+          />
+        </div>
+        <div>
+          <label htmlFor="settings-survey-desc" className={labelClass}>问卷说明</label>
+          <textarea
+            id="settings-survey-desc"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className={inputClass}
+            rows={3}
+            placeholder="选填，填写前展示给填写人"
+          />
+        </div>
+        <hr className="border-gray-200" />
         <div>
           <label className="flex items-center gap-2 text-sm text-gray-600">
             <input

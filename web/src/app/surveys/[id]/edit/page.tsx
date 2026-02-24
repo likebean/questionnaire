@@ -60,11 +60,8 @@ export default function EditSurveyPage() {
   const id = Number(params.id)
   const [survey, setSurvey] = useState<SurveyDetailVO | null>(null)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [selectedId, setSelectedId] = useState<number | null>(null)
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
   const confirmedForQuestion = useRef<number | null>(null)
 
   useEffect(() => {
@@ -74,8 +71,6 @@ export default function EditSurveyPage() {
       .then((res: ApiResponse<SurveyDetailVO>) => {
         if (res?.data) {
           setSurvey(res.data)
-          setTitle(res.data.title ?? '')
-          setDescription(res.data.description ?? '')
           if (res.data.questions?.length && !selectedId)
             setSelectedId(res.data.questions[0].id ?? null)
           confirmedForQuestion.current = null
@@ -88,23 +83,11 @@ export default function EditSurveyPage() {
   const selected = survey?.questions?.find((q) => q.id === selectedId)
   const isDraft = survey?.status === 'DRAFT'
 
-  const handleSaveBasic = () => {
-    if (!id) return
-    const needConfirm = survey?.status === 'COLLECTING' || survey?.status === 'PAUSED'
-    if (needConfirm && !window.confirm('修改题目会影响已回收数据与统计，是否继续？')) return
-    setSaving(true)
-    surveysApi
-      .updateBasic(id, { title, description })
-      .then(() => setSaving(false))
-      .catch(() => setSaving(false))
-  }
-
   const handlePublish = () => {
     if (!id) return
     setPublishing(true)
     surveysApi
-      .updateBasic(id, { title, description })
-      .then(() => surveysApi.publish(id))
+      .publish(id)
       .then(() => {
         if (survey) setSurvey({ ...survey, status: 'COLLECTING' })
         alert('发布成功')
@@ -211,38 +194,28 @@ export default function EditSurveyPage() {
 
   return (
     <div className="p-0">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">编辑问卷</h1>
-      <div className="bg-white rounded-lg shadow-card p-8 mb-6">
-        <div className="grid grid-cols-1 gap-4 mb-4">
-          <div>
-            <label htmlFor="edit-survey-title" className={labelClass}>问卷标题</label>
-            <input
-              id="edit-survey-title"
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>问卷说明</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className={inputClass}
-              rows={3}
-            />
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">编辑问卷</h1>
+          <div className="mt-1 flex gap-2 items-center text-sm text-gray-600">
+            <Link href="/surveys" className="text-blue-600 hover:underline">
+              我的问卷
+            </Link>
+            <span className="text-gray-400">/</span>
+            <Link href={`/surveys/${id}/settings`} className="text-blue-600 hover:underline">
+              {survey.title || '未命名问卷'}
+            </Link>
+            <span className="text-gray-400">/</span>
+            <span>编辑题目</span>
           </div>
         </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={handleSaveBasic}
-            disabled={saving}
-            className="px-5 py-2 rounded-lg font-semibold border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-50 shadow-sm"
+        <div className="flex gap-2 items-center">
+          <Link
+            href={`/surveys/${id}/settings`}
+            className="px-4 py-2 rounded-lg font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 text-sm"
           >
-            {saving ? '保存中...' : isDraft ? '保存草稿' : '保存'}
-          </button>
+            问卷设置
+          </Link>
           {isDraft && (
             <button
               type="button"
@@ -250,15 +223,9 @@ export default function EditSurveyPage() {
               disabled={publishing}
               className="px-5 py-2 rounded-lg font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 shadow-sm"
             >
-              {publishing ? '发布中...' : '发布'}
+              {publishing ? '发布中...' : '发布问卷'}
             </button>
           )}
-          <Link
-            href="/surveys"
-            className="px-5 py-2 rounded-lg font-semibold border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
-          >
-            取消
-          </Link>
         </div>
       </div>
       <div className="flex gap-6">
