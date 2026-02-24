@@ -111,7 +111,7 @@ export default function AnalyticsPage() {
           暂无数据
         </div>
       ) : (
-        <div className="space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {data.questions.map((q) => (
             <div key={q.questionId} className="bg-white rounded-lg shadow-card p-6">
               <SummaryBlock
