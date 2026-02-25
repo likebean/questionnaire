@@ -9,7 +9,8 @@
     "lint": "next lint",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch --passWithNoTests",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "fetch-wjx-help-links": "node scripts/fetch-wjx-help-links.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -10,3 +10,4 @@ api/target
 /web/playwright-report/
 /web/test-results/
 /api/.mvn/
+/docs/wjx-help/
