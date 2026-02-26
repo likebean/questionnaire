@@ -241,6 +241,8 @@ export interface SurveyDetailVO {
   startTime?: string | null
   endTime?: string | null
   thankYouText?: string | null
+  limitByIp?: number
+  limitByDevice?: number
   createdAt?: string
   updatedAt?: string
   questions: SurveyQuestionVO[]
@@ -265,6 +267,7 @@ export interface SubmitItemDTO {
 export interface SubmitRequestDTO {
   items: SubmitItemDTO[]
   durationSeconds?: number
+  deviceId?: string | null
 }
 
 export interface UpdateSettingsDTO {
@@ -273,6 +276,8 @@ export interface UpdateSettingsDTO {
   startTime?: string | null
   endTime?: string | null
   thankYouText?: string | null
+  limitByIp?: number | null
+  limitByDevice?: number | null
 }
 
 export const surveysApi = {

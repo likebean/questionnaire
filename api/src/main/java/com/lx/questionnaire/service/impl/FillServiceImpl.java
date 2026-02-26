@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -82,8 +83,29 @@ public class FillServiceImpl implements FillService {
 
     @Override
     @Transactional
-    public void submit(String surveyId, String userId, SubmitRequestDTO request) {
+    public void submit(String surveyId, String userId, SubmitRequestDTO request, String clientIp) {
         getFillMetadata(surveyId, userId);
+
+        Survey s = surveyMapper.selectById(surveyId);
+        if (s != null) {
+            Integer limitByIp = s.getLimitByIp();
+            if (limitByIp != null && limitByIp > 0 && clientIp != null && !clientIp.isBlank()) {
+                long ipCount = responseMapper.selectCount(new LambdaQueryWrapper<Response>()
+                        .eq(Response::getSurveyId, surveyId).eq(Response::getSubmittedIp, clientIp));
+                if (ipCount >= limitByIp) {
+                    throw new BusinessException(ErrorCode.SURVEY_IP_LIMIT);
+                }
+            }
+            Integer limitByDevice = s.getLimitByDevice();
+            String deviceId = request != null ? request.getDeviceId() : null;
+            if (limitByDevice != null && limitByDevice > 0 && deviceId != null && !deviceId.isBlank()) {
+                long deviceCount = responseMapper.selectCount(new LambdaQueryWrapper<Response>()
+                        .eq(Response::getSurveyId, surveyId).eq(Response::getDeviceId, deviceId));
+                if (deviceCount >= limitByDevice) {
+                    throw new BusinessException(ErrorCode.SURVEY_DEVICE_LIMIT);
+                }
+            }
+        }
 
         List<SurveyQuestion> questions = surveyQuestionMapper.selectList(
                 new LambdaQueryWrapper<SurveyQuestion>().eq(SurveyQuestion::getSurveyId, surveyId).orderByAsc(SurveyQuestion::getSortOrder));
@@ -96,6 +118,8 @@ public class FillServiceImpl implements FillService {
         r.setUserId(userId);
         r.setSubmittedAt(LocalDateTime.now());
         r.setDurationSeconds(request.getDurationSeconds());
+        r.setSubmittedIp(clientIp);
+        r.setDeviceId(request != null ? request.getDeviceId() : null);
         responseMapper.insert(r);
 
         if (request.getItems() != null) {
@@ -175,6 +199,9 @@ public class FillServiceImpl implements FillService {
                 if (item.getTextValue() == null && Boolean.TRUE.equals(q.getRequired())) {
                     throw new BusinessException(ErrorCode.fail(SUBMIT_VALIDATION_CODE, "请填写：" + q.getTitle()));
                 }
+                if (item.getTextValue() != null && !item.getTextValue().isBlank()) {
+                    validateTextByConfig(item.getTextValue(), config, q.getTitle());
+                }
             }
             case TYPE_SCALE -> {
                 if (item.getScaleValue() == null) {
@@ -239,6 +266,78 @@ public class FillServiceImpl implements FillService {
         Object v = config != null ? config.get(key) : null;
         if (v instanceof Number) return ((Number) v).intValue();
         return defaultValue;
+    }
+
+    private static String getString(Map<String, Object> config, String key) {
+        Object v = config != null ? config.get(key) : null;
+        return v != null ? v.toString().trim() : null;
+    }
+
+    private void validateTextByConfig(String value, Map<String, Object> config, String questionTitle) {
+        String validationType = getString(config, "validationType");
+        if (validationType == null || "none".equalsIgnoreCase(validationType)) {
+            // only maxLength check
+            Integer maxLen = config != null && config.get("maxLength") instanceof Number
+                ? ((Number) config.get("maxLength")).intValue() : null;
+            if (maxLen != null && maxLen > 0 && value.length() > maxLen) {
+                throw new BusinessException(ErrorCode.fail(SUBMIT_VALIDATION_CODE, "长度不能超过 " + maxLen + " 个字符：" + questionTitle));
+            }
+            return;
+        }
+        Integer maxLen = config != null && config.get("maxLength") instanceof Number
+            ? ((Number) config.get("maxLength")).intValue() : null;
+        if (maxLen != null && maxLen > 0 && value.length() > maxLen) {
+            throw new BusinessException(ErrorCode.fail(SUBMIT_VALIDATION_CODE, "长度不能超过 " + maxLen + " 个字符：" + questionTitle));
+        }
+        String msg = null;
+        switch (validationType.toLowerCase()) {
+            case "number" -> {
+                if (!value.matches("-?\\d+(\\.\\d+)?")) {
+                    msg = "请填写有效数字";
+                }
+            }
+            case "integer" -> {
+                if (!value.matches("-?\\d+")) {
+                    msg = "请填写整数";
+                }
+            }
+            case "email" -> {
+                if (!value.matches("^[\\w.-]+@[\\w.-]+\\.\\w{2,}$")) {
+                    msg = "请填写有效的邮箱地址";
+                }
+            }
+            case "phone" -> {
+                if (!value.matches("^1[3-9]\\d{9}$")) {
+                    msg = "请填写有效的手机号（11位）";
+                }
+            }
+            case "idcard" -> {
+                if (!value.matches("^\\d{15}$|^\\d{17}[0-9Xx]$")) {
+                    msg = "请填写有效的身份证号（15或18位）";
+                }
+            }
+            case "url" -> {
+                if (!value.matches("^(https?|ftp)://[^\\s/$.?#].[^\\s]*$")) {
+                    msg = "请填写有效的网址";
+                }
+            }
+            case "regex" -> {
+                String regex = getString(config, "regexPattern");
+                if (regex != null && !regex.isEmpty()) {
+                    try {
+                        if (!Pattern.compile(regex).matcher(value).matches()) {
+                            msg = "格式不符合要求";
+                        }
+                    } catch (Exception e) {
+                        // invalid regex, skip
+                    }
+                }
+            }
+            default -> { }
+        }
+        if (msg != null) {
+            throw new BusinessException(ErrorCode.fail(SUBMIT_VALIDATION_CODE, msg + "：" + questionTitle));
+        }
     }
 
     private String toJsonArray(int[] arr) {

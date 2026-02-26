@@ -11,7 +11,8 @@ public interface FillService {
     FillSurveyVO getFillMetadata(String surveyId, String userId);
 
     /**
-     * 提交答卷，校验同 getFillMetadata，通过后写入 response + response_item
+     * 提交答卷，校验同 getFillMetadata，通过后写入 response + response_item。
+     * @param clientIp 提交时客户端 IP，用于按 IP 限填
      */
-    void submit(String surveyId, String userId, SubmitRequestDTO request);
+    void submit(String surveyId, String userId, SubmitRequestDTO request, String clientIp);
 }

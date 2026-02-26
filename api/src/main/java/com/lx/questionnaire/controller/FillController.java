@@ -9,6 +9,7 @@ import com.lx.questionnaire.entity.Survey;
 import com.lx.questionnaire.mapper.SurveyMapper;
 import com.lx.questionnaire.service.FillService;
 import com.lx.questionnaire.util.SecurityUtils;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -40,7 +41,8 @@ public class FillController {
      * 提交答卷。允许匿名时未登录也可提交（userId 为 null）；否则需登录。
      */
     @PostMapping("/{id}/submit")
-    public Result<Void> submit(@PathVariable String id, @RequestBody SubmitRequestDTO request) {
+    public Result<Void> submit(@PathVariable String id, @RequestBody SubmitRequestDTO request,
+                               HttpServletRequest httpRequest) {
         Survey s = surveyMapper.selectById(id);
         if (s == null) {
             throw new BusinessException(ErrorCode.SURVEY_NOT_FOUND);
@@ -49,7 +51,17 @@ public class FillController {
         if (!Boolean.TRUE.equals(s.getAllowAnonymous()) && userId == null) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
-        fillService.submit(id, userId, request);
+        String clientIp = getClientIp(httpRequest);
+        fillService.submit(id, userId, request, clientIp);
         return Result.ok();
+    }
+
+    private static String getClientIp(HttpServletRequest request) {
+        String xff = request.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isBlank()) {
+            int comma = xff.indexOf(',');
+            return (comma > 0 ? xff.substring(0, comma) : xff).trim();
+        }
+        return request.getRemoteAddr();
     }
 }

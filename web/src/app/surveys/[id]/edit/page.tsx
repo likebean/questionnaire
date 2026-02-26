@@ -336,7 +336,7 @@ export default function EditSurveyPage() {
               我的问卷
             </Link>
             <span className="text-gray-400">/</span>
-            <Link href={`/surveys/${id}/settings`} className="text-blue-600 hover:underline">
+            <Link href={`/surveys/${id}/settings`} className="text-blue-600 hover:underline whitespace-pre-line">
               {survey.title || '未命名问卷'}
             </Link>
             <span className="text-gray-400">/</span>
@@ -480,6 +480,37 @@ function QuestionEditor({
       </div>
       {(question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE') && (
         <div className="mb-4">
+          <div className="flex flex-wrap gap-4 mb-3">
+            <label className="flex items-center gap-2 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={config.optionsRandom === true}
+                onChange={(e) => setConfig('optionsRandom', e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              选项随机
+            </label>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-sm text-gray-600 whitespace-nowrap">排列：</span>
+              <select
+                value={(config.layout as string) ?? 'vertical'}
+                onChange={(e) => setConfig('layout', e.target.value)}
+                className={inputClass + ' w-28 py-1'}
+              >
+                <option value="vertical">竖向</option>
+                <option value="horizontal">横向</option>
+              </select>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={config.optionsAsTags === true}
+                onChange={(e) => setConfig('optionsAsTags', e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              标签化呈现
+            </label>
+          </div>
           <label className={labelClass}>选项（拖拽排序）</label>
           <DndContext
             sensors={useSensors(
@@ -579,14 +610,56 @@ function QuestionEditor({
         </div>
       )}
       {(question.type === 'SHORT_TEXT' || question.type === 'LONG_TEXT') && (
-        <div className="mb-4">
-          <label className={labelClass}>占位提示</label>
-          <input
-            type="text"
-            value={(config.placeholder as string) ?? ''}
-            onChange={(e) => setConfig('placeholder', e.target.value)}
-            className={inputClass}
-          />
+        <div className="mb-4 space-y-4">
+          <div>
+            <label className={labelClass}>占位提示</label>
+            <input
+              type="text"
+              value={(config.placeholder as string) ?? ''}
+              onChange={(e) => setConfig('placeholder', e.target.value)}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>校验类型</label>
+            <select
+              value={(config.validationType as string) ?? 'none'}
+              onChange={(e) => setConfig('validationType', e.target.value)}
+              className={inputClass}
+            >
+              <option value="none">无</option>
+              <option value="number">数字</option>
+              <option value="integer">整数</option>
+              <option value="email">邮箱</option>
+              <option value="phone">手机号</option>
+              <option value="idcard">身份证</option>
+              <option value="url">网址</option>
+              <option value="regex">正则</option>
+            </select>
+          </div>
+          {(config.validationType as string) === 'regex' && (
+            <div>
+              <label className={labelClass}>正则表达式</label>
+              <input
+                type="text"
+                value={(config.regexPattern as string) ?? ''}
+                onChange={(e) => setConfig('regexPattern', e.target.value)}
+                className={inputClass}
+                placeholder="如 ^1[3-9]\\d{9}$"
+              />
+            </div>
+          )}
+          <div>
+            <label className={labelClass}>最大长度（空=不限制）</label>
+            <input
+              type="number"
+              min={1}
+              value={config.maxLength === undefined || config.maxLength === null ? '' : Number(config.maxLength)}
+              onChange={(e) => setConfig('maxLength', e.target.value === '' ? undefined : parseInt(e.target.value, 10) || 0)}
+              className={inputClass + ' w-32'}
+              placeholder="不限制"
+            />
+          </div>
         </div>
       )}
       {question.type === 'SCALE' && (

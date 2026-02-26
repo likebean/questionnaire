@@ -16,6 +16,8 @@ public class Response {
     private String userId;
     private LocalDateTime submittedAt;
     private Integer durationSeconds;
+    private String submittedIp;
+    private String deviceId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

@@ -21,6 +21,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -141,7 +143,8 @@ public class SurveyServiceImpl implements SurveyService {
 
     @Override
     public void updateSettings(String id, String currentUserId, Boolean limitOncePerUser, Boolean allowAnonymous,
-                               LocalDateTime startTime, LocalDateTime endTime, String thankYouText) {
+                               LocalDateTime startTime, LocalDateTime endTime, String thankYouText,
+                               Integer limitByIp, Integer limitByDevice) {
         Survey s = requireSurvey(id);
         surveyPermissionService.requirePermission(currentUserId, "survey", s, "edit");
         if (limitOncePerUser != null) s.setLimitOncePerUser(limitOncePerUser);
@@ -149,6 +152,8 @@ public class SurveyServiceImpl implements SurveyService {
         if (startTime != null) s.setStartTime(startTime);
         if (endTime != null) s.setEndTime(endTime);
         if (thankYouText != null) s.setThankYouText(thankYouText);
+        if (limitByIp != null) s.setLimitByIp(limitByIp);
+        if (limitByDevice != null) s.setLimitByDevice(limitByDevice);
         surveyMapper.updateById(s);
     }
 
@@ -448,6 +453,9 @@ public class SurveyServiceImpl implements SurveyService {
                 new LambdaQueryWrapper<Response>().eq(Response::getSurveyId, surveyId).orderByAsc(Response::getSubmittedAt));
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         try (Workbook wb = new XSSFWorkbook()) {
+            CellStyle textCellStyle = wb.createCellStyle();
+            textCellStyle.setDataFormat(wb.getCreationHelper().createDataFormat().getFormat("@"));
+
             Sheet sheet = wb.createSheet("答卷");
             Row headerRow = sheet.createRow(0);
             headerRow.createCell(0).setCellValue("提交时间");
@@ -465,7 +473,13 @@ public class SurveyServiceImpl implements SurveyService {
                 for (int i = 0; i < questions.size(); i++) {
                     SurveyQuestion q = questions.get(i);
                     ResponseItem item = items.stream().filter(x -> x.getQuestionId().equals(q.getId())).findFirst().orElse(null);
-                    row.createCell(2 + i).setCellValue(item == null ? "" : formatAnswerShort(item, q));
+                    String cellValue = item == null ? "" : formatAnswerShort(item, q);
+                    Cell cell = row.createCell(2 + i);
+                    boolean isTextColumn = "SHORT_TEXT".equals(q.getType()) || "LONG_TEXT".equals(q.getType());
+                    if (isTextColumn) {
+                        cell.setCellStyle(textCellStyle);
+                    }
+                    cell.setCellValue(cellValue);
                 }
             }
             ByteArrayOutputStream baos = new ByteArrayOutputStream();

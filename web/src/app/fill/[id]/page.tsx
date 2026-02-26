@@ -16,6 +16,57 @@ function parseConfig(c: string | null | undefined): Record<string, unknown> {
   }
 }
 
+const VALIDATION_MESSAGES: Record<string, string> = {
+  number: '请填写有效数字',
+  integer: '请填写整数',
+  email: '请填写有效的邮箱地址',
+  phone: '请填写有效的手机号（11位）',
+  idcard: '请填写有效的身份证号（15或18位）',
+  url: '请填写有效的网址',
+  regex: '格式不符合要求',
+}
+
+function buildTextValidators(config: Record<string, unknown>): { type: string; text?: string; regex?: string; minLength?: number; maxLength?: number }[] {
+  const validationType = (config.validationType as string) || 'none'
+  if (validationType === 'none') {
+    const maxLen = typeof config.maxLength === 'number' && config.maxLength > 0 ? config.maxLength : undefined
+    if (maxLen) return [{ type: 'text', maxLength: maxLen, text: `长度不能超过 ${maxLen} 个字符` }]
+    return []
+  }
+  const list: { type: string; text?: string; regex?: string; minLength?: number; maxLength?: number }[] = []
+  const maxLen = typeof config.maxLength === 'number' && config.maxLength > 0 ? config.maxLength : undefined
+  if (maxLen) list.push({ type: 'text', maxLength: maxLen, text: `长度不能超过 ${maxLen} 个字符` })
+
+  switch (validationType) {
+    case 'number':
+      list.push({ type: 'regex', regex: '^-?\\d+(\\.\\d+)?$', text: VALIDATION_MESSAGES.number })
+      break
+    case 'integer':
+      list.push({ type: 'regex', regex: '^-?\\d+$', text: VALIDATION_MESSAGES.integer })
+      break
+    case 'email':
+      list.push({ type: 'email', text: VALIDATION_MESSAGES.email })
+      break
+    case 'phone':
+      list.push({ type: 'regex', regex: '^1[3-9]\\d{9}$', text: VALIDATION_MESSAGES.phone })
+      break
+    case 'idcard':
+      list.push({ type: 'regex', regex: '^\\d{15}$|^\\d{17}[0-9Xx]$', text: VALIDATION_MESSAGES.idcard })
+      break
+    case 'url':
+      list.push({ type: 'regex', regex: '^(https?|ftp)://[^\\s/$.?#].[^\\s]*$', text: VALIDATION_MESSAGES.url })
+      break
+    case 'regex': {
+      const regex = (config.regexPattern as string)?.trim()
+      if (regex) list.push({ type: 'regex', regex, text: VALIDATION_MESSAGES.regex })
+      break
+    }
+    default:
+      break
+  }
+  return list
+}
+
 function metaToSurveyJson(meta: FillSurveyVO): Record<string, unknown> {
   const elements = (meta.questions ?? []).map((q) => questionToElement(q))
   return {
@@ -38,10 +89,24 @@ function questionToElement(q: SurveyQuestionVO): Record<string, unknown> {
   const hasOther = config.hasOtherOption === true
   const otherAllowFill = config.otherAllowFill === true
 
+  const layout = (config.layout as string) === 'horizontal' ? 'horizontal' : 'vertical'
+  const optionsAsTags = config.optionsAsTags === true
+  const optionsRandom = config.optionsRandom === true
+
+  function shuffle<T>(arr: T[]): T[] {
+    const a = arr.slice()
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]]
+    }
+    return a
+  }
+
   switch (q.type) {
     case 'SINGLE_CHOICE': {
-      const choices: { value: number | string; text: string }[] = opts.map((o, i) => ({ value: i, text: o?.label ?? `选项${i + 1}` }))
+      let choices: { value: number | string; text: string }[] = opts.map((o, i) => ({ value: i, text: o?.label ?? `选项${i + 1}` }))
       if (hasOther) choices.push({ value: 'other', text: '其他' })
+      if (optionsRandom) choices = shuffle(choices)
       return {
         ...base,
         type: 'radiogroup',
@@ -49,32 +114,45 @@ function questionToElement(q: SurveyQuestionVO): Record<string, unknown> {
         showOtherItem: hasOther,
         otherText: '其他',
         showCommentArea: hasOther && otherAllowFill,
+        colCount: layout === 'horizontal' ? choices.length : 1,
+        ...(optionsAsTags && { className: 'fill-options-as-tags' }),
       }
     }
     case 'MULTIPLE_CHOICE': {
-      const choices: { value: number | string; text: string }[] = opts.map((o, i) => ({ value: i, text: o?.label ?? `选项${i + 1}` }))
+      let choices: { value: number | string; text: string }[] = opts.map((o, i) => ({ value: i, text: o?.label ?? `选项${i + 1}` }))
       if (hasOther) choices.push({ value: 'other', text: '其他' })
+      if (optionsRandom) choices = shuffle(choices)
       return {
         ...base,
         type: 'checkbox',
         choices,
         showOtherItem: hasOther,
         otherText: '其他',
+        colCount: layout === 'horizontal' ? choices.length : 1,
+        ...(optionsAsTags && { className: 'fill-options-as-tags' }),
       }
     }
-    case 'SHORT_TEXT':
+    case 'SHORT_TEXT': {
+      const textValidators = buildTextValidators(config)
       return {
         ...base,
         type: 'text',
         placeholder: (config.placeholder as string) ?? '',
+        maxLength: typeof config.maxLength === 'number' && config.maxLength > 0 ? config.maxLength : undefined,
+        validators: textValidators.length ? textValidators : undefined,
       }
-    case 'LONG_TEXT':
+    }
+    case 'LONG_TEXT': {
+      const commentValidators = buildTextValidators(config)
       return {
         ...base,
         type: 'comment',
         placeholder: (config.placeholder as string) ?? '',
         rows: 3,
+        maxLength: typeof config.maxLength === 'number' && config.maxLength > 0 ? config.maxLength : undefined,
+        validators: commentValidators.length ? commentValidators : undefined,
       }
+    }
     case 'SCALE': {
       const min = (config.scaleMin as number) ?? 1
       const max = (config.scaleMax as number) ?? 5
@@ -167,6 +245,16 @@ export default function FillPage() {
       .finally(() => setLoading(false))
   }, [id])
 
+  const deviceId = useMemo(() => {
+    if (typeof window === 'undefined') return null
+    let d = localStorage.getItem('fill_device_id')
+    if (!d) {
+      d = 'd_' + Math.random().toString(36).slice(2) + '_' + Date.now().toString(36)
+      localStorage.setItem('fill_device_id', d)
+    }
+    return d
+  }, [])
+
   const surveyModel = useMemo(() => {
     if (!meta) return null
     const json = metaToSurveyJson(meta)
@@ -186,7 +274,7 @@ export default function FillPage() {
       const items = surveyDataToItems(data, meta.questions ?? [])
       const durationSeconds = Math.round((Date.now() - startTime) / 1000)
       fillApi
-        .submit(id, { items, durationSeconds })
+        .submit(id, { items, durationSeconds, deviceId: deviceId ?? undefined })
         .then(() => setSubmitted(true))
         .catch((err) => {
           const d = err?.response?.data

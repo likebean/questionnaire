@@ -22,6 +22,8 @@ export default function SettingsPage() {
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
   const [thankYouText, setThankYouText] = useState('')
+  const [limitByIp, setLimitByIp] = useState(0)
+  const [limitByDevice, setLimitByDevice] = useState(0)
 
   useEffect(() => {
     if (!id) return
@@ -37,6 +39,8 @@ export default function SettingsPage() {
           setStartTime(res.data.startTime ? res.data.startTime.slice(0, 16) : '')
           setEndTime(res.data.endTime ? res.data.endTime.slice(0, 16) : '')
           setThankYouText(res.data.thankYouText ?? '')
+          setLimitByIp(res.data.limitByIp ?? 0)
+          setLimitByDevice(res.data.limitByDevice ?? 0)
         }
       })
       .catch(() => {})
@@ -52,6 +56,8 @@ export default function SettingsPage() {
       startTime: startTime ? `${startTime}:00` : null,
       endTime: endTime ? `${endTime}:00` : null,
       thankYouText: thankYouText || null,
+      limitByIp: limitByIp <= 0 ? null : limitByIp,
+      limitByDevice: limitByDevice <= 0 ? null : limitByDevice,
     }
     Promise.all([
       surveysApi.updateBasic(id, { title, description }),
@@ -83,8 +89,8 @@ export default function SettingsPage() {
           我的问卷
         </Link>
         <span className="text-gray-400">/</span>
-        <Link href={`/surveys/${id}/edit`} className="text-blue-600 hover:underline">
-          {survey.title}
+        <Link href={`/surveys/${id}/edit`} className="text-blue-600 hover:underline whitespace-pre-line">
+          {survey.title || '未命名问卷'}
         </Link>
         <span className="text-gray-400">/</span>
         <span>设置</span>
@@ -92,13 +98,13 @@ export default function SettingsPage() {
       <div className="bg-white rounded-lg shadow-card p-8 space-y-6">
         <div>
           <label htmlFor="settings-survey-title" className={labelClass}>问卷标题</label>
-          <input
+          <textarea
             id="settings-survey-title"
-            type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             className={inputClass}
-            placeholder="未命名问卷"
+            rows={2}
+            placeholder="未命名问卷，支持换行（第一行为主标题）"
           />
         </div>
         <div>
@@ -163,6 +169,28 @@ export default function SettingsPage() {
             className={inputClass}
             rows={3}
           />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>每 IP 限填次数（0=不限制）</label>
+            <input
+              type="number"
+              min={0}
+              value={limitByIp}
+              onChange={(e) => setLimitByIp(Math.max(0, parseInt(e.target.value, 10) || 0))}
+              className={inputClass + ' w-32'}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>每设备限填次数（0=不限制）</label>
+            <input
+              type="number"
+              min={0}
+              value={limitByDevice}
+              onChange={(e) => setLimitByDevice(Math.max(0, parseInt(e.target.value, 10) || 0))}
+              className={inputClass + ' w-32'}
+            />
+          </div>
         </div>
         <div className="flex gap-2">
           <button

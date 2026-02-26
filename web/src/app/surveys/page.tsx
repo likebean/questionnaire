@@ -45,7 +45,7 @@ function SurveyCard({
         <div className="flex-1 min-w-0">
           <Link
             href={`/surveys/${item.id}/edit`}
-            className="text-lg font-semibold text-gray-900 hover:text-blue-600 truncate block"
+            className="text-lg font-semibold text-gray-900 hover:text-blue-600 block line-clamp-2 whitespace-pre-line"
           >
             {item.title || '未命名问卷'}
           </Link>

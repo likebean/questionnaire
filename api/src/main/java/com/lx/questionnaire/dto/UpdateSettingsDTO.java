@@ -11,4 +11,8 @@ public class UpdateSettingsDTO {
     private LocalDateTime startTime;
     private LocalDateTime endTime;
     private String thankYouText;
+    /** 每 IP 限填次数，0=不限制 */
+    private Integer limitByIp;
+    /** 每设备限填次数，0=不限制 */
+    private Integer limitByDevice;
 }

@@ -6,6 +6,32 @@
   padding-right: var(--sd-base-padding, calc(5 * 8px));
   padding-top: var(--sd-page-vertical-padding, calc(3 * 8px));
   padding-bottom: var(--sd-page-vertical-padding, calc(3 * 8px));
+  white-space: pre-line;
+}
+.fill-page-card .sd-description {
+  white-space: pre-line;
+}
+
+/* 选项标签化呈现 */
+.fill-page-card .fill-options-as-tags .sd-item {
+  display: inline-block;
+  margin-right: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.fill-page-card .fill-options-as-tags .sd-item label {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--sjs-general-border-color, #e0e0e0);
+  border-radius: 9999px;
+  background: var(--sjs-general-backcolor-light, #f9fafb);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.fill-page-card .fill-options-as-tags .sd-item:hover label,
+.fill-page-card .fill-options-as-tags .sd-item input:checked + label {
+  border-color: var(--sjs-primary-backcolor, #19b394);
+  background: rgba(25, 179, 148, 0.08);
 }
 
 /* 2. 题目块不单独成卡：去掉阴影、与卡片同背景，题目之间无分割线 */

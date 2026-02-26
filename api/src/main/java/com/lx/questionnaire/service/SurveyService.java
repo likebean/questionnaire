@@ -17,7 +17,8 @@ public interface SurveyService {
     void updateBasic(String id, String currentUserId, String title, String description);
 
     void updateSettings(String id, String currentUserId, Boolean limitOncePerUser, Boolean allowAnonymous,
-                        java.time.LocalDateTime startTime, java.time.LocalDateTime endTime, String thankYouText);
+                        java.time.LocalDateTime startTime, java.time.LocalDateTime endTime, String thankYouText,
+                        Integer limitByIp, Integer limitByDevice);
 
     void publish(String id, String currentUserId);
 

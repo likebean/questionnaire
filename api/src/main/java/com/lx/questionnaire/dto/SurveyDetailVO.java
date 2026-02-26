@@ -18,6 +18,8 @@ public class SurveyDetailVO {
     private java.time.LocalDateTime startTime;
     private java.time.LocalDateTime endTime;
     private String thankYouText;
+    private Integer limitByIp;
+    private Integer limitByDevice;
     private java.time.LocalDateTime createdAt;
     private java.time.LocalDateTime updatedAt;
     private List<SurveyQuestion> questions;
@@ -34,6 +36,8 @@ public class SurveyDetailVO {
         vo.setStartTime(s.getStartTime());
         vo.setEndTime(s.getEndTime());
         vo.setThankYouText(s.getThankYouText());
+        vo.setLimitByIp(s.getLimitByIp());
+        vo.setLimitByDevice(s.getLimitByDevice());
         vo.setCreatedAt(s.getCreatedAt());
         vo.setUpdatedAt(s.getUpdatedAt());
         vo.setQuestions(questions);

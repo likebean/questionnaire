@@ -24,6 +24,8 @@ public abstract class ErrorCode {
     public static final ErrorCode SURVEY_NOT_STARTED = new ErrorCode(4002, "未到开始时间") {};
     public static final ErrorCode SURVEY_ENDED = new ErrorCode(4003, "问卷已截止") {};
     public static final ErrorCode SURVEY_ALREADY_SUBMITTED = new ErrorCode(4004, "您已填写过本问卷") {};
+    public static final ErrorCode SURVEY_IP_LIMIT = new ErrorCode(4006, "该 IP 填写次数已达上限") {};
+    public static final ErrorCode SURVEY_DEVICE_LIMIT = new ErrorCode(4007, "该设备填写次数已达上限") {};
 
     public static ErrorCode fail(int code, String message) {
         return new ErrorCode(code, message) {};

@@ -60,7 +60,8 @@ public class SurveyController {
         String userId = SecurityUtils.getCurrentUserId();
         if (dto == null) dto = new UpdateSettingsDTO();
         surveyService.updateSettings(id, userId, dto.getLimitOncePerUser(), dto.getAllowAnonymous(),
-                dto.getStartTime(), dto.getEndTime(), dto.getThankYouText());
+                dto.getStartTime(), dto.getEndTime(), dto.getThankYouText(),
+                dto.getLimitByIp(), dto.getLimitByDevice());
         return Result.ok();
     }
 
