@@ -67,8 +67,10 @@ function buildTextValidators(config: Record<string, unknown>): { type: string; t
   return list
 }
 
+type OptItem = { label?: string; allowFill?: boolean; imageData?: string; imageUrl?: string; description?: string; descriptionOpenInPopup?: boolean }
+
 function metaToSurveyJson(meta: FillSurveyVO): Record<string, unknown> {
-  const elements = (meta.questions ?? []).map((q) => questionToElement(q))
+  const elements = (meta.questions ?? []).flatMap((q) => questionToElements(q))
   return {
     title: meta.title,
     description: meta.description ?? '',
@@ -77,7 +79,7 @@ function metaToSurveyJson(meta: FillSurveyVO): Record<string, unknown> {
   }
 }
 
-function questionToElement(q: SurveyQuestionVO): Record<string, unknown> {
+function questionToElements(q: SurveyQuestionVO): Record<string, unknown>[] {
   const config = parseConfig(q.config)
   const name = String(q.id!)
   const base: Record<string, unknown> = {
@@ -85,13 +87,15 @@ function questionToElement(q: SurveyQuestionVO): Record<string, unknown> {
     title: q.title || '题目',
     isRequired: q.required !== false,
   }
-  const opts = (config.options as { label?: string }[]) ?? []
+  const opts = (config.options as OptItem[] | undefined) ?? []
   const hasOther = config.hasOtherOption === true
   const otherAllowFill = config.otherAllowFill === true
 
   const layout = (config.layout as string) === 'horizontal' ? 'horizontal' : 'vertical'
   const optionsAsTags = config.optionsAsTags === true
   const optionsRandom = config.optionsRandom === true
+  const defaultOptionIndex = config.defaultOptionIndex as number | undefined
+  const defaultOptionIndices = config.defaultOptionIndices as number[] | undefined
 
   function shuffle<T>(arr: T[]): T[] {
     const a = arr.slice()
@@ -104,59 +108,91 @@ function questionToElement(q: SurveyQuestionVO): Record<string, unknown> {
 
   switch (q.type) {
     case 'SINGLE_CHOICE': {
-      let choices: { value: number | string; text: string }[] = opts.map((o, i) => ({ value: i, text: o?.label ?? `选项${i + 1}` }))
+      let choices: { value: number | string; text: string; imageLink?: string; description?: string; descriptionOpenInPopup?: boolean }[] = opts.map((o: OptItem, i: number) => ({
+        value: i,
+        text: o?.label ?? `选项${i + 1}`,
+        ...((o?.imageData || o?.imageUrl) ? { imageLink: o.imageData || o.imageUrl } : {}),
+        ...(o?.description ? { description: o.description, descriptionOpenInPopup: o.descriptionOpenInPopup === true } : {}),
+      }))
       if (hasOther) choices.push({ value: 'other', text: '其他' })
       if (optionsRandom) choices = shuffle(choices)
-      return {
-        ...base,
-        type: 'radiogroup',
-        choices,
-        showOtherItem: hasOther,
-        otherText: '其他',
-        showCommentArea: hasOther && otherAllowFill,
-        colCount: layout === 'horizontal' ? choices.length : 1,
-        ...(optionsAsTags && { className: 'fill-options-as-tags' }),
+      const allowFillIndices = opts.map((o: OptItem, i: number) => (o?.allowFill ? i : -1)).filter((i: number) => i >= 0)
+      const visibleIfComment = allowFillIndices.length > 0
+        ? allowFillIndices.map((i: number) => `{${name}} = ${i}`).join(' or ')
+        : null
+      const elements: Record<string, unknown>[] = [
+        {
+          ...base,
+          type: 'radiogroup',
+          choices,
+          showOtherItem: hasOther,
+          otherText: '其他',
+          showCommentArea: hasOther && otherAllowFill,
+          colCount: layout === 'horizontal' ? choices.length : 1,
+          ...(defaultOptionIndex != null && defaultOptionIndex >= 0 && defaultOptionIndex < opts.length ? { defaultValue: defaultOptionIndex } : {}),
+          ...(optionsAsTags && { className: 'fill-options-as-tags' }),
+        },
+      ]
+      if (visibleIfComment) {
+        elements.push({
+          type: 'comment',
+          name: `${name}-Comment`,
+          title: '',
+          visibleIf: visibleIfComment,
+          isRequired: false,
+          placeholder: '请填写',
+        })
       }
+      return elements
     }
     case 'MULTIPLE_CHOICE': {
-      let choices: { value: number | string; text: string }[] = opts.map((o, i) => ({ value: i, text: o?.label ?? `选项${i + 1}` }))
+      let choices: { value: number | string; text: string; imageLink?: string; description?: string; descriptionOpenInPopup?: boolean }[] = opts.map((o: OptItem, i: number) => ({
+        value: i,
+        text: o?.label ?? `选项${i + 1}`,
+        ...((o?.imageData || o?.imageUrl) ? { imageLink: o.imageData || o.imageUrl } : {}),
+        ...(o?.description ? { description: o.description, descriptionOpenInPopup: o.descriptionOpenInPopup === true } : {}),
+      }))
       if (hasOther) choices.push({ value: 'other', text: '其他' })
       if (optionsRandom) choices = shuffle(choices)
-      return {
-        ...base,
-        type: 'checkbox',
-        choices,
-        showOtherItem: hasOther,
-        otherText: '其他',
-        colCount: layout === 'horizontal' ? choices.length : 1,
-        ...(optionsAsTags && { className: 'fill-options-as-tags' }),
-      }
+      return [
+        {
+          ...base,
+          type: 'checkbox',
+          choices,
+          showOtherItem: hasOther,
+          otherText: '其他',
+          showCommentArea: hasOther && otherAllowFill,
+          colCount: layout === 'horizontal' ? choices.length : 1,
+          ...(Array.isArray(defaultOptionIndices) && defaultOptionIndices.length > 0 ? { defaultValue: defaultOptionIndices } : {}),
+          ...(optionsAsTags && { className: 'fill-options-as-tags' }),
+        },
+      ]
     }
     case 'SHORT_TEXT': {
       const textValidators = buildTextValidators(config)
-      return {
+      return [{
         ...base,
         type: 'text',
         placeholder: (config.placeholder as string) ?? '',
         maxLength: typeof config.maxLength === 'number' && config.maxLength > 0 ? config.maxLength : undefined,
         validators: textValidators.length ? textValidators : undefined,
-      }
+      }]
     }
     case 'LONG_TEXT': {
       const commentValidators = buildTextValidators(config)
-      return {
+      return [{
         ...base,
         type: 'comment',
         placeholder: (config.placeholder as string) ?? '',
         rows: 3,
         maxLength: typeof config.maxLength === 'number' && config.maxLength > 0 ? config.maxLength : undefined,
         validators: commentValidators.length ? commentValidators : undefined,
-      }
+      }]
     }
     case 'SCALE': {
       const min = (config.scaleMin as number) ?? 1
       const max = (config.scaleMax as number) ?? 5
-      return {
+      return [{
         ...base,
         type: 'rating',
         rateMin: min,
@@ -164,10 +200,10 @@ function questionToElement(q: SurveyQuestionVO): Record<string, unknown> {
         minRateDescription: (config.scaleLeftLabel as string) ?? '',
         maxRateDescription: (config.scaleRightLabel as string) ?? '',
         displayMode: 'buttons',
-      }
+      }]
     }
     default:
-      return { ...base, type: 'text' }
+      return [{ ...base, type: 'text' }]
   }
 }
 
@@ -190,7 +226,9 @@ function surveyDataToItems(
         const textValue = (data[`${name}-Comment`] as string) ?? ''
         items.push({ questionId: q.id!, optionIndex: otherIndex, textValue })
       } else if (typeof value === 'number') {
-        items.push({ questionId: q.id!, optionIndex: value })
+        const opt = (opts[value] as OptItem | undefined)
+        const textValue = opt?.allowFill ? ((data[`${name}-Comment`] as string) ?? '') : undefined
+        items.push({ questionId: q.id!, optionIndex: value, ...(textValue !== undefined && { textValue }) })
       }
     } else if (q.type === 'MULTIPLE_CHOICE') {
       const arr = Array.isArray(value) ? value : [value]
@@ -262,6 +300,43 @@ export default function FillPage() {
     model.applyTheme(FlatLight)
     model.showNavigationButtons = false
     model.showCompletedPage = false
+    model.onAfterRenderQuestion.add((_sender, options) => {
+      const question = options.question
+      if (question.getType() !== 'radiogroup' && question.getType() !== 'checkbox') return
+      const qMeta = meta?.questions?.find((q) => String(q.id) === question.name)
+      if (!qMeta) return
+      const config = parseConfig(qMeta.config)
+      const opts = (config.options as OptItem[]) ?? []
+      const root = options.htmlElement
+      if (!root) return
+      const items = root.querySelectorAll('.sd-item')
+      items.forEach((el) => {
+        const input = el.querySelector('input')
+        const value = input?.getAttribute('value')
+        if (value == null) return
+        const num = value === 'other' ? -1 : parseInt(value, 10)
+        if (Number.isNaN(num) || num < 0) return
+        const o = opts[num]
+        if (!o?.description?.trim()) return
+        const openInPopup = o.descriptionOpenInPopup === true
+        const link = document.createElement('a')
+        link.href = o.description.trim()
+        link.textContent = ' 说明'
+        link.className = 'fill-choice-description-link text-blue-600 text-sm ml-1'
+        link.rel = 'noopener noreferrer'
+        if (openInPopup) {
+          link.target = '_blank'
+          link.onclick = (e) => {
+            e.preventDefault()
+            window.open(link.href, '_blank', 'width=600,height=400,scrollbars=yes')
+          }
+        } else {
+          link.target = '_blank'
+        }
+        const label = el.querySelector('label')
+        if (label) label.appendChild(link)
+      })
+    })
     return model
   }, [meta])
 

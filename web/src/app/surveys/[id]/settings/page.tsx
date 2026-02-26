@@ -82,7 +82,7 @@ export default function SettingsPage() {
     )
   }
 
-  const titleOneLine = (survey.title || '未命名问卷').replace(/\n.*/s, '').trim()
+  const titleOneLine = (survey.title || '未命名问卷').replace(/\n[\s\S]*/, '').trim()
   return (
     <div className="p-0">
       <h1 className="text-2xl font-bold text-gray-800 mb-6">问卷设置</h1>

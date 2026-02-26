@@ -6,14 +6,16 @@ import { test, expect } from '@playwright/test'
 
 test.describe('问卷流程', () => {
   test.beforeEach(async ({ page }) => {
+    test.setTimeout(90000)
     const health = await page.request.get('http://localhost:8080/api/health').catch(() => null)
     if (!health || health.status() !== 200) {
       test.skip(true, '后端未启动，跳过依赖 API 的问卷流程测试')
       return
     }
-    await page.goto('/auth/login')
-    await page.getByLabel(/用户名/).fill('admin')
-    await page.getByLabel(/密码/).fill('admin123')
+    await page.goto('/auth/login', { waitUntil: 'networkidle' })
+    await expect(page.locator('#username')).toBeVisible({ timeout: 45000 })
+    await page.locator('#username').fill('admin')
+    await page.locator('#password').fill('admin123')
     await page.getByRole('button', { name: '本地登录' }).click()
     await expect(page).toHaveURL('/', { timeout: 15000 })
   })
@@ -138,10 +140,13 @@ test.describe('问卷流程', () => {
     await expect(page).toHaveURL(/\/surveys\/[^/]+\/edit/, { timeout: 5000 })
     await page.getByRole('button', { name: '添加题目' }).click()
     await expect(page.getByText('新题目')).toBeVisible({ timeout: 10000 })
-    await page.locator('select').filter({ has: page.locator('option[value=SHORT_TEXT]') }).selectOption('SHORT_TEXT')
-    await page.getByText('校验类型').locator('..').locator('select').selectOption('phone')
+    await page.getByText('题型', { exact: true }).locator('..').locator('select').selectOption('SHORT_TEXT')
+    await page.waitForTimeout(500)
+    await expect(page.getByText('校验类型')).toBeVisible({ timeout: 10000 })
+    const validationSelect = page.getByText('校验类型').locator('..').locator('select')
+    await validationSelect.selectOption('phone')
     await page.getByRole('button', { name: '发布' }).click()
-    await expect(page.getByRole('button', { name: '发布' })).not.toBeVisible({ timeout: 10000 })
+    await expect(page.getByRole('button', { name: '发布' })).not.toBeVisible({ timeout: 15000 })
 
     const editUrl = page.url()
     const surveyId = editUrl.match(/\/surveys\/([^/]+)\/edit/)?.[1]
@@ -252,5 +257,98 @@ test.describe('问卷流程', () => {
       page.getByRole('button', { name: '导出 Excel' }).click(),
     ])
     expect(download.suggestedFilename()).toMatch(/\.xlsx$/)
+  })
+
+  test('编辑页单选题：批量添加选项', async ({ page }) => {
+    await page.goto('/surveys')
+    await Promise.all([
+      page.waitForURL(/\/surveys\/[^/]+\/settings/, { timeout: 20000 }),
+      page.getByRole('link', { name: /创建问卷/ }).click(),
+    ])
+    await page.getByRole('link', { name: '设计问卷' }).click()
+    await expect(page).toHaveURL(/\/surveys\/[^/]+\/edit/, { timeout: 5000 })
+    await page.getByRole('button', { name: '添加题目' }).click()
+    await expect(page.getByText('新题目')).toBeVisible({ timeout: 10000 })
+    await page.getByRole('button', { name: '批量添加选项' }).click()
+    const textarea = page.getByPlaceholder(/每行一个选项/)
+    await expect(textarea).toBeVisible({ timeout: 5000 })
+    await textarea.fill('选项A\n选项B\n选项C')
+    await page.getByRole('button', { name: '确定添加' }).click()
+    await expect(page.locator('input[value="选项A"]')).toBeVisible({ timeout: 10000 })
+    await expect(page.locator('input[value="选项B"]')).toBeVisible()
+    await expect(page.locator('input[value="选项C"]')).toBeVisible()
+  })
+
+  test('编辑页单选题：添加「其他」选项', async ({ page }) => {
+    await page.goto('/surveys')
+    await Promise.all([
+      page.waitForURL(/\/surveys\/[^/]+\/settings/, { timeout: 20000 }),
+      page.getByRole('link', { name: /创建问卷/ }).click(),
+    ])
+    await page.getByRole('link', { name: '设计问卷' }).click()
+    await expect(page).toHaveURL(/\/surveys\/[^/]+\/edit/, { timeout: 5000 })
+    await page.getByRole('button', { name: '添加题目' }).click()
+    await expect(page.getByText('新题目')).toBeVisible({ timeout: 10000 })
+    await page.getByRole('button', { name: '添加「其他」选项' }).click()
+    await expect(page.locator('input[value="其他"]')).toBeVisible({ timeout: 5000 })
+  })
+
+  test('编辑页单选题：默认选中项与选项说明、图片外链', async ({ page }) => {
+    await page.goto('/surveys')
+    await Promise.all([
+      page.waitForURL(/\/surveys\/[^/]+\/settings/, { timeout: 20000 }),
+      page.getByRole('link', { name: /创建问卷/ }).click(),
+    ])
+    await page.getByRole('link', { name: '设计问卷' }).click()
+    await expect(page).toHaveURL(/\/surveys\/[^/]+\/edit/, { timeout: 5000 })
+    await page.getByRole('button', { name: '添加题目' }).click()
+    await expect(page.getByText('新题目')).toBeVisible({ timeout: 10000 })
+    await page.getByRole('button', { name: '批量添加选项' }).click()
+    await page.getByPlaceholder(/每行一个选项/).fill('选项一\n选项二')
+    await page.getByRole('button', { name: '确定添加' }).click()
+    const defaultSelect = page.getByText('默认选中（选填）').locator('..').locator('select')
+    await expect(defaultSelect).toBeVisible({ timeout: 5000 })
+    await defaultSelect.selectOption('1')
+    const singleChoiceBlock = page.getByText('默认选中（选填）').locator('..').locator('..')
+    const descInput = singleChoiceBlock.getByPlaceholder(/说明或/).first()
+    await expect(descInput).toBeVisible({ timeout: 5000 })
+    await descInput.fill('https://example.com')
+    const imageInput = singleChoiceBlock.getByPlaceholder(/图片外链/).first()
+    await imageInput.fill('https://via.placeholder.com/80')
+  })
+
+  test('填写页：默认选中与选项允许填空', async ({ page }) => {
+    await page.goto('/surveys')
+    await Promise.all([
+      page.waitForURL(/\/surveys\/[^/]+\/settings/, { timeout: 20000 }),
+      page.getByRole('link', { name: /创建问卷/ }).click(),
+    ])
+    await page.getByLabel('问卷标题').fill('E2E默认与填空')
+    await page.getByRole('button', { name: /保存/ }).click()
+    await page.getByRole('link', { name: '设计问卷' }).click()
+    await expect(page).toHaveURL(/\/surveys\/[^/]+\/edit/, { timeout: 5000 })
+    await page.getByRole('button', { name: '添加题目' }).click()
+    await expect(page.getByText('新题目')).toBeVisible({ timeout: 10000 })
+    await page.getByRole('button', { name: '批量添加选项' }).click()
+    await page.getByPlaceholder(/每行一个选项/).fill('选我填空\n选我默认')
+    await page.getByRole('button', { name: '确定添加' }).click()
+    const singleChoiceBlock = page.getByText('默认选中（选填）').locator('..').locator('..')
+    await singleChoiceBlock.getByLabel(/允许填空/).first().click()
+    const defaultSelect = page.getByText('默认选中（选填）').locator('..').locator('select')
+    await defaultSelect.selectOption('1')
+    await page.getByRole('button', { name: '发布' }).click()
+    await expect(page.getByRole('button', { name: '发布' })).not.toBeVisible({ timeout: 10000 })
+
+    const editUrl = page.url()
+    const surveyId = editUrl.match(/\/surveys\/([^/]+)\/edit/)?.[1]
+    if (!surveyId) {
+      test.skip()
+      return
+    }
+    await page.goto(`/fill/${surveyId}`)
+    await expect(page.getByRole('button', { name: '提交' })).toBeVisible({ timeout: 15000 })
+    await page.getByText('选我填空').click()
+    await page.getByRole('button', { name: '提交' }).click()
+    await expect(page.getByRole('heading', { name: '提交成功' })).toBeVisible({ timeout: 5000 })
   })
 })

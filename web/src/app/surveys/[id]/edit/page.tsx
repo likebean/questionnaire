@@ -47,21 +47,29 @@ function parseConfig(c: string | null | undefined): Record<string, unknown> {
   }
 }
 
-type OptionItem = { sortOrder: number; label: string }
+type OptionItem = {
+  sortOrder: number
+  label: string
+  description?: string
+  descriptionOpenInPopup?: boolean
+  allowFill?: boolean
+  /** 图片外链 URL */
+  imageUrl?: string
+  /** 图片 data URL（base64），上传后存于此；展示时优先于 imageUrl */
+  imageData?: string
+}
 function getOptions(config: Record<string, unknown>): OptionItem[] {
   const o = config.options
   if (!Array.isArray(o)) return [{ sortOrder: 0, label: '选项1' }]
-  return o.map((x: { sortOrder?: number; label?: string }, i: number) => ({
-    sortOrder: x.sortOrder ?? i,
-    label: x.label ?? `选项${i + 1}`,
+  return o.map((x: Record<string, unknown>, i: number) => ({
+    sortOrder: (x.sortOrder as number) ?? i,
+    label: (x.label as string) ?? `选项${i + 1}`,
+    description: x.description as string | undefined,
+    descriptionOpenInPopup: x.descriptionOpenInPopup === true,
+    allowFill: x.allowFill === true,
+    imageUrl: x.imageUrl as string | undefined,
+    imageData: x.imageData as string | undefined,
   }))
-}
-
-function getOtherOptionConfig(config: Record<string, unknown>): { hasOtherOption: boolean; otherAllowFill: boolean } {
-  return {
-    hasOtherOption: config.hasOtherOption === true,
-    otherAllowFill: config.otherAllowFill === true,
-  }
 }
 
 function getInt(config: Record<string, unknown>, key: string, def: number): number {
@@ -133,15 +141,17 @@ function SortableQuestionRow({
 function SortableOptionRow({
   index,
   opt,
-  onLabelChange,
+  onOptionChange,
   onRemove,
   inputClass,
+  labelClass,
 }: {
   index: number
   opt: OptionItem
-  onLabelChange: (label: string) => void
+  onOptionChange: (patch: Partial<OptionItem>) => void
   onRemove: () => void
   inputClass: string
+  labelClass: string
 }) {
   const id = `opt-${index}`
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
@@ -151,30 +161,134 @@ function SortableOptionRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={'mb-2 flex flex-wrap items-center gap-2' + (isDragging ? ' opacity-50' : '')}
+      className={'mb-3 p-2 rounded-lg border border-gray-100 ' + (isDragging ? ' opacity-50' : '')}
     >
-      <button
-        type="button"
-        className="p-1.5 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing touch-none shrink-0"
-        title="拖拽排序"
-        {...attributes}
-        {...listeners}
-      >
-        <i className="fas fa-grip-vertical text-xs" />
-      </button>
-      <input
-        type="text"
-        value={opt.label}
-        onChange={(e) => onLabelChange(e.target.value)}
-        className={inputClass + ' flex-1 min-w-0'}
-      />
-      <button
-        type="button"
-        onClick={onRemove}
-        className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm shrink-0"
-      >
-        删除
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="p-1.5 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing touch-none shrink-0"
+          title="拖拽排序"
+          {...attributes}
+          {...listeners}
+        >
+          <i className="fas fa-grip-vertical text-xs" />
+        </button>
+        <input
+          type="text"
+          value={opt.label}
+          onChange={(e) => onOptionChange({ label: e.target.value })}
+          className={inputClass + ' flex-1 min-w-0'}
+          placeholder="选项文案"
+        />
+        <label className="flex items-center gap-1.5 cursor-pointer text-gray-600 text-sm shrink-0">
+          <input
+            type="checkbox"
+            checked={opt.allowFill === true}
+            onChange={(e) => onOptionChange({ allowFill: e.target.checked })}
+            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+          <span>允许填空</span>
+        </label>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm shrink-0"
+        >
+          删除
+        </button>
+      </div>
+      <div className="mt-3 ml-8 space-y-4 text-sm">
+        {/* 说明与行为 */}
+        <div className="rounded-lg border border-gray-200 bg-gray-50/50 p-3 space-y-2">
+          <div className="flex items-center gap-2 text-gray-600 font-medium">
+            <i className="fas fa-info-circle text-gray-400" />
+            <span>选项说明</span>
+          </div>
+          <input
+            type="text"
+            value={opt.description ?? ''}
+            onChange={(e) => onOptionChange({ description: e.target.value || undefined })}
+            className={inputClass + ' w-full'}
+            placeholder="说明文字或链接 https://..."
+          />
+          <div className="flex flex-wrap gap-4 pt-1">
+            <label className="flex items-center gap-1.5 cursor-pointer text-gray-600">
+              <input
+                type="checkbox"
+                checked={opt.descriptionOpenInPopup === true}
+                onChange={(e) => onOptionChange({ descriptionOpenInPopup: e.target.checked })}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span>链接点击时弹窗打开</span>
+            </label>
+          </div>
+        </div>
+
+        {/* 选项图片 */}
+        <div className="rounded-lg border border-gray-200 bg-gray-50/50 p-3 space-y-2">
+          <div className="flex items-center gap-2 text-gray-600 font-medium">
+            <i className="fas fa-image text-gray-400" />
+            <span>选项图片</span>
+          </div>
+          <input
+            type="text"
+            value={opt.imageUrl ?? ''}
+            onChange={(e) => onOptionChange({ imageUrl: e.target.value?.trim() || undefined })}
+            className={inputClass + ' w-full'}
+            placeholder="图片外链 https://..."
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              className="hidden"
+              id={`opt-image-${id}`}
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                e.target.value = ''
+                if (!file) return
+                const MAX_BYTES = 512 * 1024
+                if (file.size > MAX_BYTES) {
+                  alert(`图片请小于 ${MAX_BYTES / 1024}KB，当前约 ${Math.round(file.size / 1024)}KB`)
+                  return
+                }
+                const reader = new FileReader()
+                reader.onload = () => {
+                  const data = reader.result as string
+                  if (data?.startsWith('data:image/')) onOptionChange({ imageData: data })
+                }
+                reader.readAsDataURL(file)
+              }}
+            />
+            <label
+              htmlFor={`opt-image-${id}`}
+              className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 cursor-pointer text-sm shrink-0"
+            >
+              本地上传
+            </label>
+            {(opt.imageData || opt.imageUrl) && (
+              <>
+                <img
+                  src={opt.imageData || opt.imageUrl}
+                  alt=""
+                  className="h-12 w-12 object-cover rounded border border-gray-200"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                />
+                {opt.imageData && (
+                  <button
+                    type="button"
+                    onClick={() => onOptionChange({ imageData: undefined })}
+                    className="text-red-600 hover:bg-red-50 px-2 py-1 rounded text-sm"
+                  >
+                    移除上传图
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+          <p className="text-xs text-gray-500">外链与上传二选一或只填其一；上传 &lt;512KB，支持 jpg/png/gif/webp</p>
+        </div>
+      </div>
     </div>
   )
 }
@@ -336,7 +450,7 @@ export default function EditSurveyPage() {
               我的问卷
             </Link>
             <span className="text-gray-400">/</span>
-            <span>{(survey.title || '未命名问卷').replace(/\n.*/s, '').trim()}-设计</span>
+            <span>{(survey.title || '未命名问卷').replace(/\n[\s\S]*/, '').trim()}-设计</span>
           </div>
         </div>
         <div className="flex gap-2 items-center">
@@ -419,6 +533,12 @@ function QuestionEditor({
 }) {
   const config = parseConfig(question.config)
   const options = getOptions(config)
+  const [showBatchAdd, setShowBatchAdd] = useState(false)
+  const [batchAddText, setBatchAddText] = useState('')
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor)
+  )
 
   const setConfig = (key: string, value: unknown) => {
     const next = { ...config, [key]: value }
@@ -427,6 +547,21 @@ function QuestionEditor({
 
   const setOptions = (opts: OptionItem[]) => {
     setConfig('options', opts)
+  }
+
+  const handleBatchAddOptions = () => {
+    const lines = batchAddText
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+    if (lines.length === 0) return
+    const newOpts: OptionItem[] = lines.map((label, i) => ({
+      sortOrder: options.length + i,
+      label,
+    }))
+    setOptions([...options, ...newOpts])
+    setBatchAddText('')
+    setShowBatchAdd(false)
   }
 
   return (
@@ -507,12 +642,42 @@ function QuestionEditor({
               标签化呈现
             </label>
           </div>
+          <div className="mb-3">
+            <label className={labelClass}>默认选中（选填）</label>
+            {question.type === 'SINGLE_CHOICE' ? (
+              <select
+                value={config.defaultOptionIndex === undefined || config.defaultOptionIndex === null ? '' : Number(config.defaultOptionIndex)}
+                onChange={(e) => setConfig('defaultOptionIndex', e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+                className={inputClass + ' w-48'}
+              >
+                <option value="">无默认</option>
+                {options.map((_, i) => (
+                  <option key={i} value={i}>{options[i]?.label || `选项${i + 1}`}</option>
+                ))}
+              </select>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {options.map((_, i) => (
+                  <label key={i} className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Array.isArray(config.defaultOptionIndices) && config.defaultOptionIndices.includes(i)}
+                      onChange={(e) => {
+                        const arr = (config.defaultOptionIndices as number[] | undefined) ?? []
+                        const next = e.target.checked ? [...arr, i].sort((a, b) => a - b) : arr.filter((x) => x !== i)
+                        setConfig('defaultOptionIndices', next.length ? next : undefined)
+                      }}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm">{(options[i]?.label || `选项${i + 1}`).slice(0, 12)}{(options[i]?.label?.length ?? 0) > 12 ? '…' : ''}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
           <label className={labelClass}>选项（拖拽排序）</label>
           <DndContext
-            sensors={useSensors(
-              useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-              useSensor(KeyboardSensor)
-            )}
+            sensors={sensors}
             collisionDetection={closestCenter}
             onDragEnd={(event: DragEndEvent) => {
               const { active, over } = event
@@ -529,55 +694,69 @@ function QuestionEditor({
                   key={i}
                   index={i}
                   opt={opt}
-                  onLabelChange={(label) => {
+                  onOptionChange={(patch) => {
                     const next = options.slice()
-                    next[i] = { ...next[i], label }
+                    next[i] = { ...next[i], ...patch }
                     setOptions(next)
                   }}
                   onRemove={() => setOptions(options.filter((_, j) => j !== i))}
                   inputClass={inputClass}
+                  labelClass={labelClass}
                 />
               ))}
             </SortableContext>
           </DndContext>
-          <button
-            type="button"
-            onClick={() => setOptions([...options, { sortOrder: options.length, label: `选项${options.length + 1}` }])}
-            className="text-blue-600 hover:underline text-sm"
-          >
-            添加选项
-          </button>
-          {(() => {
-            const { hasOtherOption, otherAllowFill } = getOtherOptionConfig(config)
-            return (
-              <div className="mt-3 pt-3 border-t border-gray-100">
-                <label className="flex items-center gap-2 text-sm text-gray-600">
-                  <input
-                    type="checkbox"
-                    checked={hasOtherOption}
-                    onChange={(e) => {
-                      const v = e.target.checked
-                      setConfig('hasOtherOption', v)
-                      if (!v) setConfig('otherAllowFill', false)
-                    }}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  添加「其他」选项
-                </label>
-                {hasOtherOption && (
-                  <label className="flex items-center gap-2 text-sm text-gray-600 mt-2 ml-6">
-                    <input
-                      type="checkbox"
-                      checked={otherAllowFill}
-                      onChange={(e) => setConfig('otherAllowFill', e.target.checked)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    其他项允许填空
-                  </label>
-                )}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setOptions([...options, { sortOrder: options.length, label: `选项${options.length + 1}` }])}
+              className="text-blue-600 hover:underline text-sm"
+            >
+              添加选项
+            </button>
+            <button
+              type="button"
+              onClick={() => setOptions([...options, { sortOrder: options.length, label: '其他', allowFill: true }])}
+              className="text-blue-600 hover:underline text-sm"
+            >
+              添加「其他」选项
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowBatchAdd((v) => !v)}
+              className="text-blue-600 hover:underline text-sm"
+            >
+              批量添加选项
+            </button>
+          </div>
+          {showBatchAdd && (
+            <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <label className={labelClass}>每行一个选项，可直接粘贴 Excel 列或文本</label>
+              <textarea
+                value={batchAddText}
+                onChange={(e) => setBatchAddText(e.target.value)}
+                className={inputClass + ' mt-1'}
+                rows={6}
+                placeholder="每行一个选项，可从 Excel 或文档中复制多行粘贴"
+              />
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleBatchAddOptions}
+                  className="px-4 py-2 rounded-lg font-medium bg-blue-600 text-white hover:bg-blue-700 text-sm"
+                >
+                  确定添加
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowBatchAdd(false); setBatchAddText('') }}
+                  className="px-4 py-2 rounded-lg font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 text-sm"
+                >
+                  取消
+                </button>
               </div>
-            )
-          })()}
+            </div>
+          )}
           {question.type === 'MULTIPLE_CHOICE' && (
             <div className="mt-3 flex gap-4">
               <div>
