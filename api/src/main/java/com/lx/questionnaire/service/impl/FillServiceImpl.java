@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 public class FillServiceImpl implements FillService {
 
     private static final String STATUS_DRAFT = "DRAFT";
+    private static final String STATUS_SUBMITTED = "SUBMITTED";
     private static final String STATUS_COLLECTING = "COLLECTING";
     private static final String STATUS_PAUSED = "PAUSED";
     private static final String STATUS_ENDED = "ENDED";
@@ -71,10 +72,27 @@ public class FillServiceImpl implements FillService {
         }
         if (Boolean.TRUE.equals(s.getLimitOncePerUser()) && userId != null) {
             long count = responseMapper.selectCount(new LambdaQueryWrapper<Response>()
-                    .eq(Response::getSurveyId, surveyId).eq(Response::getUserId, userId));
+                    .eq(Response::getSurveyId, surveyId).eq(Response::getUserId, userId).eq(Response::getStatus, STATUS_SUBMITTED));
             if (count > 0) {
                 throw new BusinessException(ErrorCode.SURVEY_ALREADY_SUBMITTED);
             }
+        }
+        List<SurveyQuestion> questions = surveyQuestionMapper.selectList(
+                new LambdaQueryWrapper<SurveyQuestion>().eq(SurveyQuestion::getSurveyId, surveyId).orderByAsc(SurveyQuestion::getSortOrder));
+        return FillSurveyVO.from(s, questions);
+    }
+
+    @Override
+    public FillSurveyVO getFillMetadataForPreview(String surveyId, String userId) {
+        Survey s = surveyMapper.selectById(surveyId);
+        if (s == null) {
+            throw new BusinessException(ErrorCode.SURVEY_NOT_FOUND);
+        }
+        if (userId == null || userId.isBlank()) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+        }
+        if (!userId.equals(s.getCreatorId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
         }
         List<SurveyQuestion> questions = surveyQuestionMapper.selectList(
                 new LambdaQueryWrapper<SurveyQuestion>().eq(SurveyQuestion::getSurveyId, surveyId).orderByAsc(SurveyQuestion::getSortOrder));
@@ -91,7 +109,7 @@ public class FillServiceImpl implements FillService {
             Integer limitByIp = s.getLimitByIp();
             if (limitByIp != null && limitByIp > 0 && clientIp != null && !clientIp.isBlank()) {
                 long ipCount = responseMapper.selectCount(new LambdaQueryWrapper<Response>()
-                        .eq(Response::getSurveyId, surveyId).eq(Response::getSubmittedIp, clientIp));
+                        .eq(Response::getSurveyId, surveyId).eq(Response::getSubmittedIp, clientIp).eq(Response::getStatus, STATUS_SUBMITTED));
                 if (ipCount >= limitByIp) {
                     throw new BusinessException(ErrorCode.SURVEY_IP_LIMIT);
                 }
@@ -100,7 +118,7 @@ public class FillServiceImpl implements FillService {
             String deviceId = request != null ? request.getDeviceId() : null;
             if (limitByDevice != null && limitByDevice > 0 && deviceId != null && !deviceId.isBlank()) {
                 long deviceCount = responseMapper.selectCount(new LambdaQueryWrapper<Response>()
-                        .eq(Response::getSurveyId, surveyId).eq(Response::getDeviceId, deviceId));
+                        .eq(Response::getSurveyId, surveyId).eq(Response::getDeviceId, deviceId).eq(Response::getStatus, STATUS_SUBMITTED));
                 if (deviceCount >= limitByDevice) {
                     throw new BusinessException(ErrorCode.SURVEY_DEVICE_LIMIT);
                 }
@@ -113,14 +131,35 @@ public class FillServiceImpl implements FillService {
 
         validateSubmitItems(surveyId, request.getItems(), questionMap);
 
-        Response r = new Response();
-        r.setSurveyId(surveyId);
-        r.setUserId(userId);
-        r.setSubmittedAt(LocalDateTime.now());
-        r.setDurationSeconds(request.getDurationSeconds());
-        r.setSubmittedIp(clientIp);
-        r.setDeviceId(request != null ? request.getDeviceId() : null);
-        responseMapper.insert(r);
+        Survey sForDraft = surveyMapper.selectById(surveyId);
+        String deviceId = request != null ? request.getDeviceId() : null;
+        LambdaQueryWrapper<Response> draftQuery = new LambdaQueryWrapper<Response>()
+                .eq(Response::getSurveyId, surveyId).eq(Response::getStatus, STATUS_DRAFT);
+        if (Boolean.TRUE.equals(sForDraft != null && sForDraft.getAllowAnonymous())) {
+            draftQuery.eq(Response::getDeviceId, deviceId);
+        } else {
+            draftQuery.eq(Response::getUserId, userId);
+        }
+        Response r = responseMapper.selectOne(draftQuery);
+        if (r != null) {
+            r.setStatus(STATUS_SUBMITTED);
+            r.setUserId(userId);
+            r.setSubmittedAt(LocalDateTime.now());
+            r.setDurationSeconds(request.getDurationSeconds());
+            r.setSubmittedIp(clientIp);
+            responseMapper.updateById(r);
+            responseItemMapper.delete(new LambdaQueryWrapper<ResponseItem>().eq(ResponseItem::getResponseId, r.getId()));
+        } else {
+            r = new Response();
+            r.setSurveyId(surveyId);
+            r.setUserId(userId);
+            r.setStatus(STATUS_SUBMITTED);
+            r.setSubmittedAt(LocalDateTime.now());
+            r.setDurationSeconds(request.getDurationSeconds());
+            r.setSubmittedIp(clientIp);
+            r.setDeviceId(deviceId);
+            responseMapper.insert(r);
+        }
 
         if (request.getItems() != null) {
             for (SubmitItemDTO item : request.getItems()) {
@@ -131,6 +170,80 @@ public class FillServiceImpl implements FillService {
                 }
             }
         }
+    }
+
+    @Override
+    @Transactional
+    public void saveDraft(String surveyId, String userId, String deviceId, List<SubmitItemDTO> items) {
+        Survey s = surveyMapper.selectById(surveyId);
+        if (s == null) throw new BusinessException(ErrorCode.SURVEY_NOT_FOUND);
+        if (STATUS_DRAFT.equals(s.getStatus())) return;
+        if (STATUS_ENDED.equals(s.getStatus()) || STATUS_PAUSED.equals(s.getStatus())) return;
+
+        boolean byUser = !Boolean.TRUE.equals(s.getAllowAnonymous());
+        if (byUser && (userId == null || userId.isBlank())) return;
+        if (!byUser && (deviceId == null || deviceId.isBlank())) return;
+
+        LambdaQueryWrapper<Response> q = new LambdaQueryWrapper<Response>()
+                .eq(Response::getSurveyId, surveyId).eq(Response::getStatus, STATUS_DRAFT);
+        if (byUser) q.eq(Response::getUserId, userId); else q.eq(Response::getDeviceId, deviceId);
+        Response r = responseMapper.selectOne(q);
+        if (r == null) {
+            r = new Response();
+            r.setSurveyId(surveyId);
+            r.setUserId(userId);
+            r.setStatus(STATUS_DRAFT);
+            r.setSubmittedAt(null);
+            r.setDeviceId(deviceId);
+            responseMapper.insert(r);
+        } else {
+            r.setUserId(userId);
+            r.setDeviceId(deviceId);
+            responseMapper.updateById(r);
+        }
+        responseItemMapper.delete(new LambdaQueryWrapper<ResponseItem>().eq(ResponseItem::getResponseId, r.getId()));
+        if (items != null) {
+            for (SubmitItemDTO item : items) {
+                if (item.getQuestionId() == null) continue;
+                ResponseItem ri = buildResponseItem(item, r.getId());
+                if (ri != null) responseItemMapper.insert(ri);
+            }
+        }
+    }
+
+    @Override
+    public List<SubmitItemDTO> getDraft(String surveyId, String userId, String deviceId) {
+        if (surveyId == null) return null;
+        Survey s = surveyMapper.selectById(surveyId);
+        if (s == null) return null;
+        boolean byUser = !Boolean.TRUE.equals(s.getAllowAnonymous());
+        if (byUser && (userId == null || userId.isBlank())) return null;
+        if (!byUser && (deviceId == null || deviceId.isBlank())) return null;
+        LambdaQueryWrapper<Response> q = new LambdaQueryWrapper<Response>()
+                .eq(Response::getSurveyId, surveyId).eq(Response::getStatus, STATUS_DRAFT);
+        if (byUser) q.eq(Response::getUserId, userId); else q.eq(Response::getDeviceId, deviceId);
+        Response r = responseMapper.selectOne(q);
+        if (r == null) return null;
+        List<ResponseItem> list = responseItemMapper.selectList(new LambdaQueryWrapper<ResponseItem>().eq(ResponseItem::getResponseId, r.getId()));
+        return list.stream().map(this::responseItemToSubmitItem).filter(Objects::nonNull).collect(Collectors.toList());
+    }
+
+    private SubmitItemDTO responseItemToSubmitItem(ResponseItem ri) {
+        if (ri == null || ri.getQuestionId() == null) return null;
+        SubmitItemDTO dto = new SubmitItemDTO();
+        dto.setQuestionId(ri.getQuestionId());
+        dto.setOptionIndex(ri.getOptionIndex());
+        if (ri.getOptionIndices() != null && !ri.getOptionIndices().isBlank()) {
+            try {
+                List<?> arr = objectMapper.readValue(ri.getOptionIndices(), List.class);
+                dto.setOptionIndices(arr.stream().filter(x -> x instanceof Number).map(x -> ((Number) x).intValue()).mapToInt(i -> i).toArray());
+            } catch (JsonProcessingException e) {
+                // ignore
+            }
+        }
+        dto.setTextValue(ri.getTextValue());
+        dto.setScaleValue(ri.getScaleValue());
+        return dto;
     }
 
     private void validateSubmitItems(String surveyId, List<SubmitItemDTO> items, Map<Long, SurveyQuestion> questionMap) {

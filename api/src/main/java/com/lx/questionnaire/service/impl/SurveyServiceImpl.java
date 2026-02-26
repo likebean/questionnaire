@@ -359,7 +359,7 @@ public class SurveyServiceImpl implements SurveyService {
         surveyPermissionService.requirePermission(currentUserId, "response", s, "view");
         Page<Response> p = new Page<>(page, pageSize);
         Page<Response> result = responseMapper.selectPage(p,
-                new LambdaQueryWrapper<Response>().eq(Response::getSurveyId, surveyId).orderByDesc(Response::getSubmittedAt));
+                new LambdaQueryWrapper<Response>().eq(Response::getSurveyId, surveyId).eq(Response::getStatus, "SUBMITTED").orderByDesc(Response::getSubmittedAt));
         List<SurveyQuestion> questions = surveyQuestionMapper.selectList(
                 new LambdaQueryWrapper<SurveyQuestion>().eq(SurveyQuestion::getSurveyId, surveyId).orderByAsc(SurveyQuestion::getSortOrder));
         Map<Long, SurveyQuestion> qMap = questions.stream().collect(Collectors.toMap(SurveyQuestion::getId, x -> x));
@@ -388,7 +388,7 @@ public class SurveyServiceImpl implements SurveyService {
         Survey s = requireSurvey(surveyId);
         surveyPermissionService.requirePermission(currentUserId, "response", s, "view");
         Response r = responseMapper.selectOne(new LambdaQueryWrapper<Response>()
-                .eq(Response::getSurveyId, surveyId).eq(Response::getId, responseId));
+                .eq(Response::getSurveyId, surveyId).eq(Response::getId, responseId).eq(Response::getStatus, "SUBMITTED"));
         if (r == null) throw new BusinessException(ErrorCode.NOT_FOUND);
         List<SurveyQuestion> questions = surveyQuestionMapper.selectList(
                 new LambdaQueryWrapper<SurveyQuestion>().eq(SurveyQuestion::getSurveyId, surveyId).orderByAsc(SurveyQuestion::getSortOrder));
@@ -417,6 +417,9 @@ public class SurveyServiceImpl implements SurveyService {
     public AnalyticsResponse getAnalytics(String surveyId, String currentUserId) {
         Survey s = requireSurvey(surveyId);
         surveyPermissionService.requirePermission(currentUserId, "response", s, "view");
+        List<Long> submittedResponseIds = responseMapper.selectList(
+                        new LambdaQueryWrapper<Response>().eq(Response::getSurveyId, surveyId).eq(Response::getStatus, "SUBMITTED"))
+                .stream().map(Response::getId).collect(Collectors.toList());
         List<SurveyQuestion> questions = surveyQuestionMapper.selectList(
                 new LambdaQueryWrapper<SurveyQuestion>().eq(SurveyQuestion::getSurveyId, surveyId).orderByAsc(SurveyQuestion::getSortOrder));
         List<AnalyticsQuestionVO> result = new ArrayList<>();
@@ -425,8 +428,8 @@ public class SurveyServiceImpl implements SurveyService {
             aq.setQuestionId(q.getId());
             aq.setType(q.getType());
             aq.setTitle(q.getTitle());
-            List<ResponseItem> items = responseItemMapper.selectList(
-                    new LambdaQueryWrapper<ResponseItem>().eq(ResponseItem::getQuestionId, q.getId()));
+            List<ResponseItem> items = submittedResponseIds.isEmpty() ? List.of() : responseItemMapper.selectList(
+                    new LambdaQueryWrapper<ResponseItem>().eq(ResponseItem::getQuestionId, q.getId()).in(ResponseItem::getResponseId, submittedResponseIds));
             if (items.isEmpty()) {
                 if ("SINGLE_CHOICE".equals(q.getType()) || "MULTIPLE_CHOICE".equals(q.getType())) aq.setSummary(new ArrayList<AnalyticsOptionSummary>());
                 else if ("SCALE".equals(q.getType())) aq.setSummary(new com.lx.questionnaire.dto.AnalyticsScaleSummary());
@@ -450,7 +453,7 @@ public class SurveyServiceImpl implements SurveyService {
         List<SurveyQuestion> questions = surveyQuestionMapper.selectList(
                 new LambdaQueryWrapper<SurveyQuestion>().eq(SurveyQuestion::getSurveyId, surveyId).orderByAsc(SurveyQuestion::getSortOrder));
         List<Response> responses = responseMapper.selectList(
-                new LambdaQueryWrapper<Response>().eq(Response::getSurveyId, surveyId).orderByAsc(Response::getSubmittedAt));
+                new LambdaQueryWrapper<Response>().eq(Response::getSurveyId, surveyId).eq(Response::getStatus, "SUBMITTED").orderByAsc(Response::getSubmittedAt));
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         try (Workbook wb = new XSSFWorkbook()) {
             CellStyle textCellStyle = wb.createCellStyle();

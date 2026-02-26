@@ -371,8 +371,12 @@ export interface AnalyticsResponse {
 }
 
 export const fillApi = {
-  getMetadata: (id: string) =>
-    apiClient.get(`/fill/${id}`) as Promise<ApiResponse<FillSurveyVO>>,
+  getMetadata: (id: string, preview?: boolean) =>
+    apiClient.get(`/fill/${id}`, { params: preview ? { preview: 'true' } : undefined }) as Promise<ApiResponse<FillSurveyVO>>,
   submit: (id: string, data: SubmitRequestDTO) =>
     apiClient.post(`/fill/${id}/submit`, data) as Promise<ApiResponse<null>>,
+  getDraft: (id: string, deviceId?: string | null) =>
+    apiClient.get(`/fill/${id}/draft`, { params: deviceId ? { deviceId } : undefined }) as Promise<ApiResponse<SubmitItemDTO[]>>,
+  saveDraft: (id: string, data: { items: SubmitItemDTO[]; deviceId?: string | null }) =>
+    apiClient.post(`/fill/${id}/draft`, data) as Promise<ApiResponse<null>>,
 }

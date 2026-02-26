@@ -14,6 +14,8 @@ public class Response {
     private Long id;
     private String surveyId;
     private String userId;
+    /** DRAFT=草稿（实时保存） SUBMITTED=已提交 */
+    private String status;
     private LocalDateTime submittedAt;
     private Integer durationSeconds;
     private String submittedIp;

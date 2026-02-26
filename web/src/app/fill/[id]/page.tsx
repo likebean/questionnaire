@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { Model } from 'survey-core'
 import { FlatLight } from 'survey-core/themes'
@@ -252,25 +252,69 @@ function surveyDataToItems(
   return items
 }
 
+function applyDraftToModel(
+  model: Model,
+  draft: SubmitItemDTO[],
+  questions: SurveyQuestionVO[],
+  parseConfig: (c: string | null | undefined) => Record<string, unknown>
+) {
+  const opts = (config: Record<string, unknown>) => (config.options as OptItem[] | undefined) ?? []
+  for (const item of draft) {
+    const q = questions.find((qu) => qu.id === item.questionId)
+    if (!q) continue
+    const name = String(q.id)
+    const config = parseConfig(q.config)
+    const options = opts(config)
+    const otherIndex = options.length
+
+    if (q.type === 'SINGLE_CHOICE') {
+      if (item.optionIndex == null) continue
+      if (item.optionIndex === otherIndex) {
+        model.setValue(name, 'other')
+        if (item.textValue != null) model.setValue(`${name}-Comment`, item.textValue)
+      } else {
+        model.setValue(name, item.optionIndex)
+      }
+    } else if (q.type === 'MULTIPLE_CHOICE') {
+      if (!item.optionIndices?.length) continue
+      const value = item.optionIndices.map((i) => (i === otherIndex ? 'other' : i))
+      model.setValue(name, value)
+      if (item.textValue != null) model.setValue(`${name}-Comment`, item.textValue)
+    } else if (q.type === 'SHORT_TEXT' || q.type === 'LONG_TEXT' || q.type === 'text' || q.type === 'comment') {
+      if (item.textValue != null) model.setValue(name, item.textValue)
+    } else if (q.type === 'SCALE' || q.type === 'rating') {
+      if (item.scaleValue != null) model.setValue(name, item.scaleValue)
+    } else if (item.textValue != null) {
+      model.setValue(name, item.textValue)
+    }
+  }
+}
+
 export default function FillPage() {
   const params = useParams()
   const id = params.id as string
   const [meta, setMeta] = useState<FillSurveyVO | null>(null)
+  const [previewMode, setPreviewMode] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<{ code: number; message: string } | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [thankYou, setThankYou] = useState('感谢您的填写！')
   const startTime = useMemo(() => Date.now(), [])
+  const draftAppliedRef = useRef(false)
+  const [draftApplyKey, setDraftApplyKey] = useState(0)
 
   useEffect(() => {
     if (!id) return
+    const preview = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('preview') === '1'
+    draftAppliedRef.current = false
     fillApi
-      .getMetadata(id)
+      .getMetadata(id, preview)
       .then((res) => {
         if (res?.data) {
           setMeta(res.data)
           setThankYou(res.data.thankYouText ?? '感谢您的填写！')
+          if (preview) setPreviewMode(true)
         }
       })
       .catch((err) => {
@@ -300,6 +344,18 @@ export default function FillPage() {
     model.applyTheme(FlatLight)
     model.showNavigationButtons = false
     model.showCompletedPage = false
+    let saveDraftTimer: ReturnType<typeof setTimeout> | null = null
+    model.onValueChanged.add((sender) => {
+      if (previewMode) return
+      if (saveDraftTimer) clearTimeout(saveDraftTimer)
+      saveDraftTimer = setTimeout(() => {
+        saveDraftTimer = null
+        const questions = meta?.questions ?? []
+        const items = surveyDataToItems(sender.data, questions)
+        if (items.length === 0) return
+        fillApi.saveDraft(params.id as string, { items, deviceId: deviceId ?? undefined }).catch(() => {})
+      }, 800)
+    })
     model.onAfterRenderQuestion.add((_sender, options) => {
       const question = options.question
       if (question.getType() !== 'radiogroup' && question.getType() !== 'checkbox') return
@@ -338,12 +394,36 @@ export default function FillPage() {
       })
     })
     return model
-  }, [meta])
+  }, [meta, previewMode])
+
+  useEffect(() => {
+    if (!id || !meta || !surveyModel || !deviceId || previewMode || draftAppliedRef.current) return
+    let cancelled = false
+    fillApi
+      .getDraft(id, deviceId)
+      .then((res) => {
+        if (cancelled) return
+        const list = res?.data
+        if (list?.length && surveyModel && meta) {
+          applyDraftToModel(surveyModel, list, meta.questions ?? [], parseConfig)
+          draftAppliedRef.current = true
+          setDraftApplyKey((k) => k + 1)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [id, meta, surveyModel, deviceId, previewMode])
 
   const handleSubmit = () => {
     if (!surveyModel || !meta) return
     surveyModel.validate()
     if (!surveyModel.hasErrors()) {
+      if (previewMode) {
+        setSubmitted(true)
+        return
+      }
       setSubmitting(true)
       const data = surveyModel.data
       const items = surveyDataToItems(data, meta.questions ?? [])
@@ -383,10 +463,16 @@ export default function FillPage() {
 
   return (
     <div className="fill-page-wrapper py-8 px-4">
+      {previewMode && (
+        <div className="max-w-2xl mx-auto mb-4 px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm text-center">
+          预览模式：仅查看填写效果，提交不会保存答卷。
+        </div>
+      )}
       <div className="fill-page-surveyjs fill-page-card w-full max-w-2xl mx-auto bg-white rounded-xl shadow-card overflow-hidden">
         <Survey
           model={surveyModel}
           id={`survey-${id}`}
+          key={`survey-${id}-${draftApplyKey}`}
         />
         <div className="fill-page-footer">
           <button

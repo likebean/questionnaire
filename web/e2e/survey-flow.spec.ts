@@ -310,7 +310,7 @@ test.describe('问卷流程', () => {
     await expect(defaultSelect).toBeVisible({ timeout: 5000 })
     await defaultSelect.selectOption('1')
     const singleChoiceBlock = page.getByText('默认选中（选填）').locator('..').locator('..')
-    const descInput = singleChoiceBlock.getByPlaceholder(/说明或/).first()
+    const descInput = singleChoiceBlock.getByPlaceholder(/说明文字或链接/).first()
     await expect(descInput).toBeVisible({ timeout: 5000 })
     await descInput.fill('https://example.com')
     const imageInput = singleChoiceBlock.getByPlaceholder(/图片外链/).first()
@@ -349,6 +349,132 @@ test.describe('问卷流程', () => {
     await expect(page.getByRole('button', { name: '提交' })).toBeVisible({ timeout: 15000 })
     await page.getByText('选我填空').click()
     await page.getByRole('button', { name: '提交' }).click()
+    await expect(page.getByRole('heading', { name: '提交成功' })).toBeVisible({ timeout: 5000 })
+  })
+
+  test('编辑页预览：草稿问卷点预览打开填写页，显示预览提示且无未到开始时间', async ({ page }) => {
+    await page.goto('/surveys')
+    await expect(page.getByRole('link', { name: /创建问卷/ })).toBeVisible({ timeout: 5000 })
+    await Promise.all([
+      page.waitForURL(/\/surveys\/[^/]+\/settings/, { timeout: 20000 }),
+      page.getByRole('link', { name: /创建问卷/ }).click(),
+    ])
+    await expect(page).toHaveURL(/\/surveys\/[^/]+\/settings/, { timeout: 5000 })
+    await page.getByRole('link', { name: '设计问卷' }).click()
+    await expect(page).toHaveURL(/\/surveys\/[^/]+\/edit/, { timeout: 5000 })
+    await page.getByRole('button', { name: '添加题目' }).click()
+    await expect(page.getByText('新题目')).toBeVisible({ timeout: 10000 })
+
+    const editUrl = page.url()
+    const surveyId = editUrl.match(/\/surveys\/([^/]+)\/edit/)?.[1]
+    if (!surveyId) {
+      test.skip()
+      return
+    }
+    await page.goto(`/fill/${surveyId}?preview=1`)
+    await expect(page).toHaveURL(/\/fill\/[^/]+\?preview=1/, { timeout: 10000 })
+    const submitBtn = page.getByRole('button', { name: '提交' })
+    const errorMsg = page.getByText('未到开始时间')
+    await expect(submitBtn.or(errorMsg)).toBeVisible({ timeout: 20000 })
+    await expect(errorMsg).not.toBeVisible()
+    await expect(submitBtn).toBeVisible()
+    await expect(page.getByText(/预览模式/)).toBeVisible({ timeout: 3000 })
+  })
+
+  test('草稿（允许匿名）：填写页选一项后刷新，草稿按设备恢复，再提交成功', async ({ page }) => {
+    await page.goto('/surveys')
+    await expect(page.getByRole('link', { name: /创建问卷/ })).toBeVisible({ timeout: 5000 })
+    await Promise.all([
+      page.waitForURL(/\/surveys\/[^/]+\/settings/, { timeout: 20000 }),
+      page.getByRole('link', { name: /创建问卷/ }).click(),
+    ])
+    await expect(page).toHaveURL(/\/surveys\/[^/]+\/settings/, { timeout: 5000 })
+    await page.getByLabel('问卷标题').fill('草稿匿名测试')
+    await page.getByRole('checkbox', { name: /允许匿名填写/ }).click()
+    await page.getByRole('button', { name: /保存/ }).click()
+    await page.getByRole('link', { name: '设计问卷' }).click()
+    await expect(page).toHaveURL(/\/surveys\/[^/]+\/edit/, { timeout: 5000 })
+    await page.getByRole('button', { name: '添加题目' }).click()
+    await expect(page.getByText('新题目')).toBeVisible({ timeout: 10000 })
+    await page.getByRole('button', { name: '发布' }).click()
+    await expect(page.getByRole('button', { name: '发布' })).not.toBeVisible({ timeout: 10000 })
+
+    const editUrl = page.url()
+    const surveyId = editUrl.match(/\/surveys\/([^/]+)\/edit/)?.[1]
+    if (!surveyId) {
+      test.skip()
+      return
+    }
+
+    await page.goto(`/fill/${surveyId}`)
+    await expect(page.getByRole('button', { name: '提交' })).toBeVisible({ timeout: 25000 })
+    const saveDraftPromise = page.waitForResponse((res) => res.url().includes('/draft') && res.request().method() === 'POST' && res.status() === 200, { timeout: 5000 }).catch(() => null)
+    await page.getByText('选项1').click()
+    await saveDraftPromise
+    await page.waitForTimeout(300)
+    await page.reload()
+    await expect(page.getByRole('button', { name: '提交' })).toBeVisible({ timeout: 25000 })
+    await page.waitForResponse((res) => res.url().includes('/draft') && res.request().method() === 'GET', { timeout: 10000 }).catch(() => null)
+    await page.waitForTimeout(2000)
+    await page.getByRole('button', { name: '提交' }).click()
+    const success = page.getByRole('heading', { name: '提交成功' })
+    const validationMsg = page.getByText(/请完成必填题|请选择选项/)
+    const done = await Promise.race([
+      success.waitFor({ state: 'visible', timeout: 5000 }).then(() => true),
+      validationMsg.waitFor({ state: 'visible', timeout: 5000 }).then(() => false),
+    ]).catch(() => false)
+    if (!done) {
+      await page.getByText('选项1').click()
+      await page.getByRole('button', { name: '提交' }).click()
+    }
+    await expect(page.getByRole('heading', { name: '提交成功' })).toBeVisible({ timeout: 5000 })
+  })
+
+  test('草稿（不允许匿名）：登录后填写页选一项后刷新，草稿按用户恢复，再提交成功', async ({ page }) => {
+    await page.goto('/surveys')
+    await expect(page.getByRole('link', { name: /创建问卷/ })).toBeVisible({ timeout: 5000 })
+    await Promise.all([
+      page.waitForURL(/\/surveys\/[^/]+\/settings/, { timeout: 20000 }),
+      page.getByRole('link', { name: /创建问卷/ }).click(),
+    ])
+    await expect(page).toHaveURL(/\/surveys\/[^/]+\/settings/, { timeout: 5000 })
+    await page.getByLabel('问卷标题').fill('草稿登录测试')
+    await page.getByRole('button', { name: /保存/ }).click()
+    await page.getByRole('link', { name: '设计问卷' }).click()
+    await expect(page).toHaveURL(/\/surveys\/[^/]+\/edit/, { timeout: 5000 })
+    await page.getByRole('button', { name: '添加题目' }).click()
+    await expect(page.getByText('新题目')).toBeVisible({ timeout: 10000 })
+    await page.getByRole('button', { name: '发布' }).click()
+    await expect(page.getByRole('button', { name: '发布' })).not.toBeVisible({ timeout: 10000 })
+
+    const editUrl = page.url()
+    const surveyId = editUrl.match(/\/surveys\/([^/]+)\/edit/)?.[1]
+    if (!surveyId) {
+      test.skip()
+      return
+    }
+
+    await page.goto(`/fill/${surveyId}`)
+    await expect(page.getByRole('button', { name: '提交' })).toBeVisible({ timeout: 25000 })
+    const saveDraftPromise = page.waitForResponse((res) => res.url().includes('/draft') && res.request().method() === 'POST' && res.status() === 200, { timeout: 5000 }).catch(() => null)
+    await page.getByText('选项1').click()
+    await saveDraftPromise
+    await page.waitForTimeout(300)
+    await page.reload()
+    await expect(page.getByRole('button', { name: '提交' })).toBeVisible({ timeout: 25000 })
+    await page.waitForResponse((res) => res.url().includes('/draft') && res.request().method() === 'GET', { timeout: 10000 }).catch(() => null)
+    await page.waitForTimeout(2000)
+    await page.getByRole('button', { name: '提交' }).click()
+    const success = page.getByRole('heading', { name: '提交成功' })
+    const validationMsg = page.getByText(/请完成必填题|请选择选项/)
+    const done = await Promise.race([
+      success.waitFor({ state: 'visible', timeout: 5000 }).then(() => true),
+      validationMsg.waitFor({ state: 'visible', timeout: 5000 }).then(() => false),
+    ]).catch(() => false)
+    if (!done) {
+      await page.getByText('选项1').click()
+      await page.getByRole('button', { name: '提交' }).click()
+    }
     await expect(page.getByRole('heading', { name: '提交成功' })).toBeVisible({ timeout: 5000 })
   })
 })

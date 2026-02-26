@@ -454,6 +454,14 @@ export default function EditSurveyPage() {
           </div>
         </div>
         <div className="flex gap-2 items-center">
+          <a
+            href={`/fill/${id}?preview=1`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2 rounded-lg font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 text-sm"
+          >
+            预览
+          </a>
           <Link
             href={`/surveys/${id}/settings`}
             className="px-4 py-2 rounded-lg font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 text-sm"
