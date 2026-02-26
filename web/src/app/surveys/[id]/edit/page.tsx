@@ -336,11 +336,7 @@ export default function EditSurveyPage() {
               我的问卷
             </Link>
             <span className="text-gray-400">/</span>
-            <Link href={`/surveys/${id}/settings`} className="text-blue-600 hover:underline whitespace-pre-line">
-              {survey.title || '未命名问卷'}
-            </Link>
-            <span className="text-gray-400">/</span>
-            <span>编辑题目</span>
+            <span>{(survey.title || '未命名问卷').replace(/\n.*/s, '').trim()}-设计</span>
           </div>
         </div>
         <div className="flex gap-2 items-center">

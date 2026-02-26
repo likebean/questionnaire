@@ -154,7 +154,7 @@ export default function MySurveysPage() {
     surveysApi
       .create({ title: '未命名问卷' })
       .then((res) => {
-        if (res?.data?.id) router.push(`/surveys/${res.data.id}/edit`)
+        if (res?.data?.id) router.push(`/surveys/${res.data.id}/settings`)
         else load()
       })
       .catch(() => load())
@@ -481,7 +481,7 @@ function CopySurveyButton({
     surveysApi
       .copy(surveyId)
       .then((res) => {
-        if (res?.data?.id) router.push(`/surveys/${res.data.id}/edit`)
+        if (res?.data?.id) router.push(`/surveys/${res.data.id}/settings`)
         else onDone()
       })
       .finally(() => setLoading(false))

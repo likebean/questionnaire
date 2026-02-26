@@ -60,11 +60,7 @@ export default function ResponsesPage() {
           我的问卷
         </Link>
         <span className="text-gray-400">/</span>
-        <Link href={`/surveys/${id}/edit`} className="text-blue-600 hover:underline">
-          {survey.title}
-        </Link>
-        <span className="text-gray-400">/</span>
-        <span>查看答卷</span>
+        <span>{(survey.title || '未命名问卷').replace(/\n.*/s, '').trim()}-答卷</span>
       </div>
       {loading ? (
         <p className="text-gray-500">加载中...</p>

@@ -1,5 +1,5 @@
 /**
- * 问卷流程 E2E：登录 → 我的问卷 → 创建问卷 → 编辑页 → 设置 → 发布 → 填写链接 → 填写页提交。
+ * 问卷流程 E2E：登录 → 我的问卷 → 创建问卷 → 设置页 → 设计问卷(编辑页) → 发布 → 填写链接 → 填写页提交。
  * 运行前请先启动后端：cd api && ./mvnw spring-boot:run
  */
 import { test, expect } from '@playwright/test'
@@ -29,17 +29,18 @@ test.describe('问卷流程', () => {
     expect(count).toBeLessThanOrEqual(20)
   })
 
-  test('我的问卷列表 → 创建问卷 → 进入编辑页', async ({ page }) => {
+  test('我的问卷列表 → 创建问卷 → 进入设置页', async ({ page }) => {
     await page.getByRole('link', { name: '我的问卷', exact: true }).click()
     await expect(page).toHaveURL('/surveys', { timeout: 10000 })
     await expect(page.getByRole('heading', { name: '我的问卷' })).toBeVisible()
 
     await expect(page.getByRole('link', { name: /创建问卷/ })).toBeVisible({ timeout: 5000 })
     await Promise.all([
-      page.waitForURL(/\/surveys\/[^/]+\/edit/, { timeout: 20000 }),
+      page.waitForURL(/\/surveys\/[^/]+\/settings/, { timeout: 20000 }),
       page.getByRole('link', { name: /创建问卷/ }).click(),
     ])
-    await expect(page.getByText(/题目列表|编辑|问卷标题/)).toBeVisible({ timeout: 5000 })
+    await expect(page.getByRole('heading', { name: '问卷设置' })).toBeVisible({ timeout: 5000 })
+    await expect(page.getByRole('link', { name: '设计问卷' })).toBeVisible()
   })
 
   test('编辑页保存标题、添加题目、发布', async ({ page }) => {
@@ -47,16 +48,13 @@ test.describe('问卷流程', () => {
     await expect(page.getByRole('heading', { name: '我的问卷' })).toBeVisible({ timeout: 10000 })
     await expect(page.getByRole('link', { name: /创建问卷/ })).toBeVisible({ timeout: 5000 })
     await Promise.all([
-      page.waitForURL(/\/surveys\/[^/]+\/edit/, { timeout: 20000 }),
+      page.waitForURL(/\/surveys\/[^/]+\/settings/, { timeout: 20000 }),
       page.getByRole('link', { name: /创建问卷/ }).click(),
     ])
-
-    await page.getByRole('link', { name: '问卷设置' }).click()
     await expect(page).toHaveURL(/\/surveys\/[^/]+\/settings/, { timeout: 5000 })
     await page.getByLabel('问卷标题').fill('E2E测试问卷')
     await page.getByRole('button', { name: /保存/ }).click()
-    await expect(page.getByRole('link', { name: 'E2E测试问卷' })).toBeVisible({ timeout: 5000 })
-    await page.getByRole('link', { name: 'E2E测试问卷' }).click()
+    await page.getByRole('link', { name: '设计问卷' }).click()
     await expect(page).toHaveURL(/\/surveys\/[^/]+\/edit/, { timeout: 5000 })
     await page.getByRole('button', { name: '添加题目' }).click()
     await expect(page.getByText('新题目')).toBeVisible({ timeout: 10000 })
@@ -68,15 +66,13 @@ test.describe('问卷流程', () => {
     await page.goto('/surveys')
     await expect(page.getByRole('link', { name: /创建问卷/ })).toBeVisible({ timeout: 5000 })
     await Promise.all([
-      page.waitForURL(/\/surveys\/[^/]+\/edit/, { timeout: 20000 }),
+      page.waitForURL(/\/surveys\/[^/]+\/settings/, { timeout: 20000 }),
       page.getByRole('link', { name: /创建问卷/ }).click(),
     ])
-    await page.getByRole('link', { name: '问卷设置' }).click()
     await expect(page).toHaveURL(/\/surveys\/[^/]+\/settings/, { timeout: 5000 })
     await page.getByLabel('问卷标题').fill('填写测试')
     await page.getByRole('button', { name: /保存/ }).click()
-    await expect(page.getByRole('link', { name: '填写测试' })).toBeVisible({ timeout: 5000 })
-    await page.getByRole('link', { name: '填写测试' }).click()
+    await page.getByRole('link', { name: '设计问卷' }).click()
     await expect(page).toHaveURL(/\/surveys\/[^/]+\/edit/, { timeout: 5000 })
     await page.getByRole('button', { name: '添加题目' }).click()
     await expect(page.getByText('新题目')).toBeVisible({ timeout: 10000 })
@@ -101,14 +97,13 @@ test.describe('问卷流程', () => {
     await page.goto('/surveys')
     await expect(page.getByRole('link', { name: /创建问卷/ })).toBeVisible({ timeout: 5000 })
     await Promise.all([
-      page.waitForURL(/\/surveys\/[^/]+\/edit/, { timeout: 20000 }),
+      page.waitForURL(/\/surveys\/[^/]+\/settings/, { timeout: 20000 }),
       page.getByRole('link', { name: /创建问卷/ }).click(),
     ])
-    await page.getByRole('link', { name: '问卷设置' }).click()
     await expect(page).toHaveURL(/\/surveys\/[^/]+\/settings/, { timeout: 5000 })
     await page.getByLabel('问卷标题').fill('主标题\n副标题')
     await page.getByRole('button', { name: /保存/ }).click()
-    await expect(page.getByRole('link', { name: /主标题/ })).toBeVisible({ timeout: 10000 })
+    await expect(page.getByRole('link', { name: '设计问卷' })).toBeVisible({ timeout: 10000 })
     const settingsUrl = page.url()
     const surveyId = settingsUrl.match(/\/surveys\/([^/]+)\/settings/)?.[1]
     if (!surveyId) {
@@ -134,13 +129,12 @@ test.describe('问卷流程', () => {
     await page.goto('/surveys')
     await expect(page.getByRole('link', { name: /创建问卷/ })).toBeVisible({ timeout: 5000 })
     await Promise.all([
-      page.waitForURL(/\/surveys\/[^/]+\/edit/, { timeout: 20000 }),
+      page.waitForURL(/\/surveys\/[^/]+\/settings/, { timeout: 20000 }),
       page.getByRole('link', { name: /创建问卷/ }).click(),
     ])
-    await page.getByRole('link', { name: '问卷设置' }).click()
     await page.getByLabel('问卷标题').fill('E2E填空校验')
     await page.getByRole('button', { name: /保存/ }).click()
-    await page.getByRole('link', { name: 'E2E填空校验' }).click()
+    await page.getByRole('link', { name: '设计问卷' }).click()
     await expect(page).toHaveURL(/\/surveys\/[^/]+\/edit/, { timeout: 5000 })
     await page.getByRole('button', { name: '添加题目' }).click()
     await expect(page.getByText('新题目')).toBeVisible({ timeout: 10000 })
@@ -167,9 +161,11 @@ test.describe('问卷流程', () => {
     await page.goto('/surveys')
     await expect(page.getByRole('link', { name: /创建问卷/ })).toBeVisible({ timeout: 5000 })
     await Promise.all([
-      page.waitForURL(/\/surveys\/[^/]+\/edit/, { timeout: 20000 }),
+      page.waitForURL(/\/surveys\/[^/]+\/settings/, { timeout: 20000 }),
       page.getByRole('link', { name: /创建问卷/ }).click(),
     ])
+    await page.getByRole('link', { name: '设计问卷' }).click()
+    await expect(page).toHaveURL(/\/surveys\/[^/]+\/edit/, { timeout: 5000 })
     await page.getByRole('button', { name: '添加题目' }).click()
     await expect(page.getByText('新题目')).toBeVisible({ timeout: 10000 })
     await expect(page.getByText('选项随机')).toBeVisible({ timeout: 3000 })
@@ -184,10 +180,9 @@ test.describe('问卷流程', () => {
     await page.goto('/surveys')
     await expect(page.getByRole('link', { name: /创建问卷/ })).toBeVisible({ timeout: 5000 })
     await Promise.all([
-      page.waitForURL(/\/surveys\/[^/]+\/edit/, { timeout: 20000 }),
+      page.waitForURL(/\/surveys\/[^/]+\/settings/, { timeout: 20000 }),
       page.getByRole('link', { name: /创建问卷/ }).click(),
     ])
-    await page.getByRole('link', { name: '问卷设置' }).click()
     await expect(page).toHaveURL(/\/surveys\/[^/]+\/settings/, { timeout: 5000 })
     await page.getByLabel('问卷标题').fill('设备限填测试')
     await page.getByText(/每设备限填次数/).locator('..').locator('input').fill('1')
@@ -226,15 +221,14 @@ test.describe('问卷流程', () => {
     await page.goto('/surveys')
     await expect(page.getByRole('link', { name: /创建问卷/ })).toBeVisible({ timeout: 5000 })
     await Promise.all([
-      page.waitForURL(/\/surveys\/[^/]+\/edit/, { timeout: 20000 }),
+      page.waitForURL(/\/surveys\/[^/]+\/settings/, { timeout: 20000 }),
       page.getByRole('link', { name: /创建问卷/ }).click(),
     ])
-    await page.getByRole('link', { name: '问卷设置' }).click()
     await page.getByLabel('问卷标题').fill('导出测试')
     await page.getByRole('button', { name: /保存/ }).click()
     await expect(page.getByRole('button', { name: '保存' })).toBeVisible({ timeout: 5000 })
-    await expect(page.getByRole('link', { name: '导出测试' })).toBeVisible({ timeout: 15000 })
-    await page.getByRole('link', { name: '导出测试' }).first().click()
+    await page.getByRole('link', { name: '设计问卷' }).click()
+    await expect(page).toHaveURL(/\/surveys\/[^/]+\/edit/, { timeout: 5000 })
     await page.getByRole('button', { name: '添加题目' }).click()
     await expect(page.getByText('新题目')).toBeVisible({ timeout: 10000 })
     await page.getByRole('button', { name: '发布' }).click()

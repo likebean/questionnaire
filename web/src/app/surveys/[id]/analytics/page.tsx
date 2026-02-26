@@ -87,11 +87,7 @@ export default function AnalyticsPage() {
           我的问卷
         </Link>
         <span className="text-gray-400">/</span>
-        <Link href={`/surveys/${id}/edit`} className="text-blue-600 hover:underline">
-          {survey.title}
-        </Link>
-        <span className="text-gray-400">/</span>
-        <span>统计分析</span>
+        <span>{(survey.title || '未命名问卷').replace(/\n.*/s, '').trim()}-统计</span>
       </div>
       {loading ? (
         <p className="text-gray-500">加载中...</p>

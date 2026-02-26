@@ -65,9 +65,10 @@ export default function SettingsPage() {
     ])
       .then(() => {
         if (survey) setSurvey({ ...survey, title, description })
-        setSaving(false)
+        alert('保存成功')
       })
-      .catch(() => setSaving(false))
+      .catch((e) => alert(e?.response?.data?.message || '保存失败'))
+      .finally(() => setSaving(false))
   }
 
   if (loading || !survey) {
@@ -81,6 +82,7 @@ export default function SettingsPage() {
     )
   }
 
+  const titleOneLine = (survey.title || '未命名问卷').replace(/\n.*/s, '').trim()
   return (
     <div className="p-0">
       <h1 className="text-2xl font-bold text-gray-800 mb-6">问卷设置</h1>
@@ -89,11 +91,7 @@ export default function SettingsPage() {
           我的问卷
         </Link>
         <span className="text-gray-400">/</span>
-        <Link href={`/surveys/${id}/edit`} className="text-blue-600 hover:underline whitespace-pre-line">
-          {survey.title || '未命名问卷'}
-        </Link>
-        <span className="text-gray-400">/</span>
-        <span>设置</span>
+        <span>{titleOneLine}-设置</span>
       </div>
       <div className="bg-white rounded-lg shadow-card p-8 space-y-6">
         <div>
@@ -192,7 +190,7 @@ export default function SettingsPage() {
             />
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button
             type="button"
             onClick={handleSave}
@@ -205,7 +203,7 @@ export default function SettingsPage() {
             href={`/surveys/${id}/edit`}
             className="px-5 py-2 rounded-lg font-semibold border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
           >
-            取消
+            设计问卷
           </Link>
         </div>
       </div>
