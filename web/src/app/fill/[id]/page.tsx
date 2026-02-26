@@ -429,7 +429,7 @@ export default function FillPage() {
       const items = surveyDataToItems(data, meta.questions ?? [])
       const durationSeconds = Math.round((Date.now() - startTime) / 1000)
       fillApi
-        .submit(id, { items, durationSeconds, deviceId: deviceId ?? undefined })
+        .submit(id, { items, durationSeconds, deviceId: deviceId ?? '' })
         .then(() => setSubmitted(true))
         .catch((err) => {
           const d = err?.response?.data

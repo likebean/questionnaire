@@ -133,14 +133,20 @@ public class FillServiceImpl implements FillService {
 
         Survey sForDraft = surveyMapper.selectById(surveyId);
         String deviceId = request != null ? request.getDeviceId() : null;
-        LambdaQueryWrapper<Response> draftQuery = new LambdaQueryWrapper<Response>()
-                .eq(Response::getSurveyId, surveyId).eq(Response::getStatus, STATUS_DRAFT);
-        if (Boolean.TRUE.equals(sForDraft != null && sForDraft.getAllowAnonymous())) {
-            draftQuery.eq(Response::getDeviceId, deviceId);
+        Response r = null;
+        if (sForDraft != null && Boolean.TRUE.equals(sForDraft.getAllowAnonymous())) {
+            if (deviceId != null && !deviceId.isBlank()) {
+                r = responseMapper.selectOne(new LambdaQueryWrapper<Response>()
+                        .eq(Response::getSurveyId, surveyId).eq(Response::getStatus, STATUS_DRAFT).eq(Response::getDeviceId, deviceId));
+            }
+            if (r == null && userId != null && !userId.isBlank()) {
+                r = responseMapper.selectOne(new LambdaQueryWrapper<Response>()
+                        .eq(Response::getSurveyId, surveyId).eq(Response::getStatus, STATUS_DRAFT).eq(Response::getUserId, userId));
+            }
         } else {
-            draftQuery.eq(Response::getUserId, userId);
+            r = responseMapper.selectOne(new LambdaQueryWrapper<Response>()
+                    .eq(Response::getSurveyId, surveyId).eq(Response::getStatus, STATUS_DRAFT).eq(Response::getUserId, userId));
         }
-        Response r = responseMapper.selectOne(draftQuery);
         if (r != null) {
             r.setStatus(STATUS_SUBMITTED);
             r.setUserId(userId);
