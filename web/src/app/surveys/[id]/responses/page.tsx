@@ -7,7 +7,6 @@ import {
   surveysApi,
   type SurveyDetailVO,
   type ResponseListResponse,
-  type ResponseDetailVO,
   type ApiResponse,
 } from '@/services/api'
 
@@ -19,7 +18,6 @@ export default function ResponsesPage() {
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const pageSize = 20
-  const [detail, setDetail] = useState<ResponseDetailVO | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -39,12 +37,6 @@ export default function ResponsesPage() {
       .catch(() => setData({ list: [], total: 0 }))
       .finally(() => setLoading(false))
   }, [id, page])
-
-  const showDetail = (responseId: number) => {
-    surveysApi.getResponseDetail(id, responseId).then((res: ApiResponse<ResponseDetailVO>) => {
-      if (res?.data) setDetail(res.data)
-    })
-  }
 
   if (!survey) return <div className="p-0">加载中...</div>
 
@@ -75,6 +67,7 @@ export default function ResponsesPage() {
               <tr>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">提交时间</th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">用时</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">用户</th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">摘要</th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">操作</th>
               </tr>
@@ -86,17 +79,23 @@ export default function ResponsesPage() {
                     {new Date(r.submittedAt).toLocaleString('zh-CN')}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600">{r.durationSeconds != null ? `${r.durationSeconds}秒` : '—'}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">
+                    {(() => {
+                      const uid = (r as { userId?: string | null; user_id?: string | null }).userId
+                        ?? (r as { userId?: string | null; user_id?: string | null }).user_id
+                      return (uid != null && String(uid).trim() !== '') ? uid : '匿名'
+                    })()}
+                  </td>
                   <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
                     {r.summary ?? '—'}
                   </td>
                   <td className="px-6 py-4">
-                    <button
-                      type="button"
-                      onClick={() => showDetail(r.id)}
+                    <Link
+                      href={`/fill/${id}?responseId=${r.id}&mode=view`}
                       className="text-blue-600 hover:underline text-sm"
                     >
                       查看
-                    </button>
+                    </Link>
                   </td>
                 </tr>
               ))}
@@ -141,34 +140,6 @@ export default function ResponsesPage() {
               </div>
             </div>
           )}
-        </div>
-      )}
-      {detail && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-10 p-4">
-          <div className="bg-white rounded-lg shadow-card max-w-lg w-full max-h-[80vh] overflow-auto p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-bold text-gray-800">答卷详情</h2>
-              <button
-                type="button"
-                onClick={() => setDetail(null)}
-                className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
-              >
-                关闭
-              </button>
-            </div>
-            <p className="text-sm text-gray-500 mb-4">
-              提交时间：{new Date(detail.submittedAt).toLocaleString('zh-CN')}
-              {detail.durationSeconds != null && `，用时 ${detail.durationSeconds} 秒`}
-            </p>
-            <div className="space-y-3">
-              {detail.items?.map((item) => (
-                <div key={item.questionId} className="border-b border-gray-100 pb-3">
-                  <div className="font-medium text-gray-700 text-sm">{item.questionTitle}</div>
-                  <div className="text-gray-600 text-sm mt-1">{item.answerText || '—'}</div>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       )}
     </div>

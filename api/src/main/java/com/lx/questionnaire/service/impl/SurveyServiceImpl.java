@@ -98,7 +98,8 @@ public class SurveyServiceImpl implements SurveyService {
             vo.setUpdatedAt(s.getUpdatedAt());
             vo.setCreatedAt(s.getCreatedAt());
             Long count = responseMapper.selectCount(new LambdaQueryWrapper<com.lx.questionnaire.entity.Response>()
-                    .eq(com.lx.questionnaire.entity.Response::getSurveyId, s.getId()));
+                    .eq(com.lx.questionnaire.entity.Response::getSurveyId, s.getId())
+                    .eq(com.lx.questionnaire.entity.Response::getStatus, "SUBMITTED"));
             vo.setResponseCount(count);
             list.add(vo);
         }
@@ -357,16 +358,18 @@ public class SurveyServiceImpl implements SurveyService {
     public ResponseListResponse listResponses(String surveyId, String currentUserId, int page, int pageSize) {
         Survey s = requireSurvey(surveyId);
         surveyPermissionService.requirePermission(currentUserId, "response", s, "view");
-        Page<Response> p = new Page<>(page, pageSize);
-        Page<Response> result = responseMapper.selectPage(p,
-                new LambdaQueryWrapper<Response>().eq(Response::getSurveyId, surveyId).eq(Response::getStatus, "SUBMITTED").orderByDesc(Response::getSubmittedAt));
+        long total = responseMapper.selectCount(
+                new LambdaQueryWrapper<Response>().eq(Response::getSurveyId, surveyId).eq(Response::getStatus, "SUBMITTED"));
+        long offset = (long) (page - 1) * pageSize;
+        List<Response> records = responseMapper.selectPageBySurveyId(surveyId, offset, pageSize);
         List<SurveyQuestion> questions = surveyQuestionMapper.selectList(
                 new LambdaQueryWrapper<SurveyQuestion>().eq(SurveyQuestion::getSurveyId, surveyId).orderByAsc(SurveyQuestion::getSortOrder));
         Map<Long, SurveyQuestion> qMap = questions.stream().collect(Collectors.toMap(SurveyQuestion::getId, x -> x));
         List<ResponseListItemVO> list = new ArrayList<>();
-        for (Response r : result.getRecords()) {
+        for (Response r : records) {
             ResponseListItemVO vo = new ResponseListItemVO();
             vo.setId(r.getId());
+            vo.setUserId(r.getUserId());
             vo.setSubmittedAt(r.getSubmittedAt());
             vo.setDurationSeconds(r.getDurationSeconds());
             List<ResponseItem> items = responseItemMapper.selectList(
@@ -380,7 +383,7 @@ public class SurveyServiceImpl implements SurveyService {
             vo.setSummary(parts.isEmpty() ? null : String.join("；", parts));
             list.add(vo);
         }
-        return new ResponseListResponse(list, result.getTotal());
+        return new ResponseListResponse(list, total);
     }
 
     @Override
@@ -397,6 +400,7 @@ public class SurveyServiceImpl implements SurveyService {
                 new LambdaQueryWrapper<ResponseItem>().eq(ResponseItem::getResponseId, responseId));
         ResponseDetailVO vo = new ResponseDetailVO();
         vo.setId(r.getId());
+        vo.setUserId(r.getUserId());
         vo.setSubmittedAt(r.getSubmittedAt());
         vo.setDurationSeconds(r.getDurationSeconds());
         List<ResponseDetailItemVO> detailItems = new ArrayList<>();
@@ -407,6 +411,19 @@ public class SurveyServiceImpl implements SurveyService {
             di.setType(q.getType());
             ResponseItem item = items.stream().filter(x -> x.getQuestionId().equals(q.getId())).findFirst().orElse(null);
             di.setAnswerText(item == null ? "—" : formatAnswerShort(item, q));
+            if (item != null) {
+                di.setOptionIndex(item.getOptionIndex());
+                di.setTextValue(item.getTextValue());
+                di.setScaleValue(item.getScaleValue());
+                if (item.getOptionIndices() != null && !item.getOptionIndices().isEmpty()) {
+                    try {
+                        JsonNode arr = JSON.readTree(item.getOptionIndices());
+                        List<Integer> indices = new ArrayList<>();
+                        for (JsonNode n : arr) indices.add(n.asInt());
+                        di.setOptionIndices(indices);
+                    } catch (Exception ignored) { }
+                }
+            }
             detailItems.add(di);
         }
         vo.setItems(detailItems);

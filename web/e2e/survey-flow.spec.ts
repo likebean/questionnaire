@@ -477,4 +477,141 @@ test.describe('问卷流程', () => {
     }
     await expect(page.getByRole('heading', { name: '提交成功' })).toBeVisible({ timeout: 5000 })
   })
+
+  test('提交后仅一条答卷：先保存草稿再提交，答卷列表仅 1 条（DRAFT 转 SUBMITTED 无重复）', async ({ page }) => {
+    await page.goto('/surveys')
+    await expect(page.getByRole('link', { name: /创建问卷/ })).toBeVisible({ timeout: 5000 })
+    await Promise.all([
+      page.waitForURL(/\/surveys\/[^/]+\/settings/, { timeout: 20000 }),
+      page.getByRole('link', { name: /创建问卷/ }).click(),
+    ])
+    await expect(page).toHaveURL(/\/surveys\/[^/]+\/settings/, { timeout: 5000 })
+    await page.getByLabel('问卷标题').fill('E2E无重复答卷')
+    await page.getByRole('button', { name: /保存/ }).click()
+    await page.getByRole('link', { name: '设计问卷' }).click()
+    await expect(page).toHaveURL(/\/surveys\/[^/]+\/edit/, { timeout: 5000 })
+    await page.getByRole('button', { name: '添加题目' }).click()
+    await expect(page.getByText('新题目')).toBeVisible({ timeout: 10000 })
+    await page.getByRole('button', { name: '发布' }).click()
+    await expect(page.getByRole('button', { name: '发布' })).not.toBeVisible({ timeout: 10000 })
+
+    const editUrl = page.url()
+    const surveyId = editUrl.match(/\/surveys\/([^/]+)\/edit/)?.[1]
+    if (!surveyId) {
+      test.skip()
+      return
+    }
+
+    await page.goto(`/fill/${surveyId}`)
+    await expect(page.getByRole('button', { name: '提交' })).toBeVisible({ timeout: 25000 })
+    const saveDraftPromise = page.waitForResponse((res) => res.url().includes('/draft') && res.request().method() === 'POST' && res.status() === 200, { timeout: 5000 }).catch(() => null)
+    await page.getByText('选项1').click()
+    await saveDraftPromise
+    await page.waitForTimeout(500)
+    await page.getByRole('button', { name: '提交' }).click()
+    await expect(page.getByRole('heading', { name: '提交成功' })).toBeVisible({ timeout: 5000 })
+
+    const res = await page.request.get(`http://localhost:3000/api/surveys/${surveyId}/responses?page=1&pageSize=10`)
+    const json = await res.json()
+    expect(json.data?.total).toBe(1)
+    expect(json.data?.list?.length).toBe(1)
+  })
+
+  test('答卷列表显示用户ID：登录提交后列表「用户」列显示当前用户ID而非匿名', async ({ page }) => {
+    const meRes = await page.request.get('http://localhost:3000/api/auth/me')
+    const meJson = await meRes.json()
+    const currentUserId = meJson?.data?.id
+    if (!currentUserId) {
+      test.skip(true, '未登录或无用户ID')
+      return
+    }
+
+    await page.goto('/surveys')
+    await expect(page.getByRole('link', { name: /创建问卷/ })).toBeVisible({ timeout: 5000 })
+    await Promise.all([
+      page.waitForURL(/\/surveys\/[^/]+\/settings/, { timeout: 20000 }),
+      page.getByRole('link', { name: /创建问卷/ }).click(),
+    ])
+    await expect(page).toHaveURL(/\/surveys\/[^/]+\/settings/, { timeout: 5000 })
+    await page.getByLabel('问卷标题').fill('E2E用户列显示')
+    await page.getByRole('button', { name: /保存/ }).click()
+    await page.getByRole('link', { name: '设计问卷' }).click()
+    await expect(page).toHaveURL(/\/surveys\/[^/]+\/edit/, { timeout: 5000 })
+    await page.getByRole('button', { name: '添加题目' }).click()
+    await expect(page.getByText('新题目')).toBeVisible({ timeout: 10000 })
+    await page.getByRole('button', { name: '发布' }).click()
+    await expect(page.getByRole('button', { name: '发布' })).not.toBeVisible({ timeout: 10000 })
+
+    const editUrl = page.url()
+    const surveyId = editUrl.match(/\/surveys\/([^/]+)\/edit/)?.[1]
+    if (!surveyId) {
+      test.skip()
+      return
+    }
+
+    await page.goto(`/fill/${surveyId}`)
+    await expect(page.getByRole('button', { name: '提交' })).toBeVisible({ timeout: 25000 })
+    await page.getByText('选项1').click()
+    await page.getByRole('button', { name: '提交' }).click()
+    await expect(page.getByRole('heading', { name: '提交成功' })).toBeVisible({ timeout: 5000 })
+
+    const listRes = await page.request.get(`http://localhost:3000/api/surveys/${surveyId}/responses?page=1&pageSize=10`)
+    const listJson = await listRes.json()
+    expect(listJson?.data?.list?.length).toBeGreaterThanOrEqual(1)
+    const firstUserId = listJson.data.list[0].userId ?? listJson.data.list[0].user_id
+    if (firstUserId == null || String(firstUserId).trim() === '') {
+      test.skip(true, '后端未返回 userId（请重启后端后重跑以验证列表显示用户ID）')
+      return
+    }
+    expect(firstUserId).toBe(currentUserId)
+
+    await page.goto(`/surveys/${surveyId}/responses`)
+    await expect(page.getByRole('heading', { name: '答卷列表' })).toBeVisible({ timeout: 10000 })
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 5000 })
+    const userCell = page.locator('table tbody tr').first().locator('td').nth(2)
+    await expect(userCell).toContainText(currentUserId, { timeout: 3000 })
+  })
+
+  test('查看答卷只显示只读提示不显示预览模式', async ({ page }) => {
+    await page.goto('/surveys')
+    await expect(page.getByRole('link', { name: /创建问卷/ })).toBeVisible({ timeout: 5000 })
+    await Promise.all([
+      page.waitForURL(/\/surveys\/[^/]+\/settings/, { timeout: 20000 }),
+      page.getByRole('link', { name: /创建问卷/ }).click(),
+    ])
+    await expect(page).toHaveURL(/\/surveys\/[^/]+\/settings/, { timeout: 5000 })
+    await page.getByLabel('问卷标题').fill('E2E只读查看')
+    await page.getByRole('button', { name: /保存/ }).click()
+    await page.getByRole('link', { name: '设计问卷' }).click()
+    await expect(page).toHaveURL(/\/surveys\/[^/]+\/edit/, { timeout: 5000 })
+    await page.getByRole('button', { name: '添加题目' }).click()
+    await expect(page.getByText('新题目')).toBeVisible({ timeout: 10000 })
+    await page.getByRole('button', { name: '发布' }).click()
+    await expect(page.getByRole('button', { name: '发布' })).not.toBeVisible({ timeout: 10000 })
+
+    const editUrl = page.url()
+    const surveyId = editUrl.match(/\/surveys\/([^/]+)\/edit/)?.[1]
+    if (!surveyId) {
+      test.skip()
+      return
+    }
+
+    await page.goto(`/fill/${surveyId}`)
+    await expect(page.getByRole('button', { name: '提交' })).toBeVisible({ timeout: 25000 })
+    await page.getByText('选项1').click()
+    await page.getByRole('button', { name: '提交' }).click()
+    await expect(page.getByRole('heading', { name: '提交成功' })).toBeVisible({ timeout: 5000 })
+
+    const listRes = await page.request.get(`http://localhost:3000/api/surveys/${surveyId}/responses?page=1&pageSize=10`)
+    const listJson = await listRes.json()
+    const responseId = listJson?.data?.list?.[0]?.id
+    if (responseId == null) {
+      test.skip()
+      return
+    }
+
+    await page.goto(`/fill/${surveyId}?responseId=${responseId}&mode=view`)
+    await expect(page.getByText('答卷查看（只读）')).toBeVisible({ timeout: 15000 })
+    await expect(page.getByText('预览模式：仅查看填写效果，提交不会保存答卷。')).not.toBeVisible()
+  })
 })

@@ -8,6 +8,8 @@ import java.util.List;
 @Data
 public class ResponseDetailVO {
     private Long id;
+    /** 提交用户ID，匿名答卷可为 null */
+    private String userId;
     private LocalDateTime submittedAt;
     private Integer durationSeconds;
     private List<ResponseDetailItemVO> items;

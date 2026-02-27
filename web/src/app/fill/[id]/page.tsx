@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { Model } from 'survey-core'
 import { FlatLight } from 'survey-core/themes'
 import { Survey } from 'survey-react-ui'
-import { fillApi, type FillSurveyVO, type SurveyQuestionVO, type SubmitItemDTO } from '@/services/api'
+import { fillApi, surveysApi, type FillSurveyVO, type SurveyQuestionVO, type SubmitItemDTO, type ResponseDetailVO } from '@/services/api'
 
 function parseConfig(c: string | null | undefined): Record<string, unknown> {
   if (!c) return {}
@@ -292,9 +293,15 @@ function applyDraftToModel(
 
 export default function FillPage() {
   const params = useParams()
+  const searchParams = useSearchParams()
   const id = params.id as string
+  const viewMode = typeof window !== 'undefined' ? searchParams.get('mode') === 'view' : false
+  const responseIdParam = typeof window !== 'undefined' ? searchParams.get('responseId') : null
+  const responseId = responseIdParam ? parseInt(responseIdParam, 10) : null
+
   const [meta, setMeta] = useState<FillSurveyVO | null>(null)
   const [previewMode, setPreviewMode] = useState(false)
+  const [responseDetail, setResponseDetail] = useState<ResponseDetailVO | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<{ code: number; message: string } | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -302,19 +309,21 @@ export default function FillPage() {
   const [thankYou, setThankYou] = useState('感谢您的填写！')
   const startTime = useMemo(() => Date.now(), [])
   const draftAppliedRef = useRef(false)
+  const viewDataAppliedRef = useRef(false)
   const [draftApplyKey, setDraftApplyKey] = useState(0)
 
   useEffect(() => {
     if (!id) return
-    const preview = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('preview') === '1'
+    const preview = typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('preview') === '1' || searchParams.get('mode') === 'view')
     draftAppliedRef.current = false
+    viewDataAppliedRef.current = false
     fillApi
       .getMetadata(id, preview)
       .then((res) => {
         if (res?.data) {
           setMeta(res.data)
           setThankYou(res.data.thankYouText ?? '感谢您的填写！')
-          if (preview) setPreviewMode(true)
+          if (preview && searchParams.get('mode') !== 'view') setPreviewMode(true)
         }
       })
       .catch((err) => {
@@ -325,7 +334,14 @@ export default function FillPage() {
         })
       })
       .finally(() => setLoading(false))
-  }, [id])
+  }, [id, searchParams])
+
+  useEffect(() => {
+    if (!viewMode || !responseId || !id || !meta) return
+    surveysApi.getResponseDetail(id, responseId).then((res) => {
+      if (res?.data) setResponseDetail(res.data)
+    }).catch(() => setResponseDetail(null))
+  }, [id, viewMode, responseId, meta])
 
   const deviceId = useMemo(() => {
     if (typeof window === 'undefined') return null
@@ -346,7 +362,7 @@ export default function FillPage() {
     model.showCompletedPage = false
     let saveDraftTimer: ReturnType<typeof setTimeout> | null = null
     model.onValueChanged.add((sender) => {
-      if (previewMode) return
+      if (previewMode || viewMode) return
       if (saveDraftTimer) clearTimeout(saveDraftTimer)
       saveDraftTimer = setTimeout(() => {
         saveDraftTimer = null
@@ -397,7 +413,7 @@ export default function FillPage() {
   }, [meta, previewMode])
 
   useEffect(() => {
-    if (!id || !meta || !surveyModel || !deviceId || previewMode || draftAppliedRef.current) return
+    if (!id || !meta || !surveyModel || !deviceId || previewMode || viewMode || draftAppliedRef.current) return
     let cancelled = false
     fillApi
       .getDraft(id, deviceId)
@@ -414,17 +430,32 @@ export default function FillPage() {
     return () => {
       cancelled = true
     }
-  }, [id, meta, surveyModel, deviceId, previewMode])
+  }, [id, meta, surveyModel, deviceId, previewMode, viewMode])
+
+  useEffect(() => {
+    if (!surveyModel || !responseDetail || !viewMode || !meta || viewDataAppliedRef.current) return
+    const draftLike: SubmitItemDTO[] = (responseDetail.items ?? []).map((it) => ({
+      questionId: it.questionId,
+      optionIndex: it.optionIndex ?? undefined,
+      optionIndices: it.optionIndices?.length ? it.optionIndices : undefined,
+      textValue: it.textValue ?? undefined,
+      scaleValue: it.scaleValue ?? undefined,
+    }))
+    applyDraftToModel(surveyModel, draftLike, meta.questions ?? [], parseConfig)
+    surveyModel.readOnly = true
+    viewDataAppliedRef.current = true
+    setDraftApplyKey((k) => k + 1)
+  }, [surveyModel, responseDetail, viewMode, meta])
 
   const handleSubmit = () => {
     if (!surveyModel || !meta) return
     surveyModel.validate()
     if (!surveyModel.hasErrors()) {
-      if (previewMode) {
+if (previewMode) {
         setSubmitted(true)
         return
       }
-      setSubmitting(true)
+    setSubmitting(true)
       const data = surveyModel.data
       const items = surveyDataToItems(data, meta.questions ?? [])
       const durationSeconds = Math.round((Date.now() - startTime) / 1000)
@@ -468,6 +499,11 @@ export default function FillPage() {
           预览模式：仅查看填写效果，提交不会保存答卷。
         </div>
       )}
+      {viewMode && (
+        <div className="max-w-2xl mx-auto mb-4 px-4 py-2 bg-slate-100 border border-slate-200 rounded-lg text-slate-700 text-sm text-center">
+          答卷查看（只读）
+        </div>
+      )}
       <div className="fill-page-surveyjs fill-page-card w-full max-w-2xl mx-auto bg-white rounded-xl shadow-card overflow-hidden">
         <Survey
           model={surveyModel}
@@ -475,15 +511,24 @@ export default function FillPage() {
           key={`survey-${id}-${draftApplyKey}`}
         />
         <div className="fill-page-footer">
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="sd-btn sd-btn--action"
-            style={{ width: '100%', padding: '12px 16px', fontSize: '1rem', fontWeight: 600 }}
-          >
-            {submitting ? '提交中...' : '提交'}
-          </button>
+          {viewMode ? (
+            <Link
+              href={`/surveys/${id}/responses`}
+              className="inline-block w-full text-center py-3 px-4 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 text-sm font-medium"
+            >
+              返回答卷列表
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={submitting}
+              className="sd-btn sd-btn--action"
+              style={{ width: '100%', padding: '12px 16px', fontSize: '1rem', fontWeight: 600 }}
+            >
+              {submitting ? '提交中...' : '提交'}
+            </button>
+          )}
         </div>
       </div>
     </div>

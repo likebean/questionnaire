@@ -323,6 +323,8 @@ export const surveysApi = {
 
 export interface ResponseListItemVO {
   id: number
+  /** 提交用户ID，匿名答卷可为 null */
+  userId?: string | null
   submittedAt: string
   durationSeconds?: number
   summary?: string
@@ -338,10 +340,17 @@ export interface ResponseDetailItemVO {
   questionTitle: string
   type: string
   answerText: string
+  /** 原始值，供 SurveyJS 只读回填 */
+  optionIndex?: number | null
+  optionIndices?: number[] | null
+  textValue?: string | null
+  scaleValue?: number | null
 }
 
 export interface ResponseDetailVO {
   id: number
+  /** 提交用户ID，匿名答卷可为 null */
+  userId?: string | null
   submittedAt: string
   durationSeconds?: number
   items: ResponseDetailItemVO[]
