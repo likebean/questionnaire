@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { departmentsApi, type DepartmentVO, type PaginatedResponse } from '@/services/api'
+import ConfirmDialog from '@/app/_components/ConfirmDialog'
 
 export default function DepartmentsPage() {
   const [data, setData] = useState<PaginatedResponse<DepartmentVO> | null>(null)
@@ -185,36 +186,19 @@ export default function DepartmentsPage() {
       )}
 
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/20" onClick={() => !deleting && setDeleteTarget(null)} />
-          <div className="relative bg-white rounded-xl shadow-lg border border-gray-200 p-6 max-w-md w-full mx-4">
-            <div className="flex justify-center text-red-500 mb-4">
-              <i className="fas fa-exclamation-triangle text-4xl" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 text-center">确认删除</h3>
-            <p className="text-gray-600 mt-4 text-center">
+        <ConfirmDialog
+          open={!!deleteTarget}
+          loading={deleting}
+          title="确认删除"
+          description={
+            <>
               确定要删除院系「{deleteTarget.name}」（{deleteTarget.code}）吗？存在子院系或关联用户时将无法删除。
-            </p>
-            <div className="mt-6 flex justify-center space-x-4">
-              <button
-                type="button"
-                className="px-5 py-2 rounded-lg font-semibold border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
-                onClick={() => !deleting && setDeleteTarget(null)}
-                disabled={deleting}
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                className="px-5 py-2 rounded-lg font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-                onClick={handleDeleteConfirm}
-                disabled={deleting}
-              >
-                {deleting ? '删除中...' : '确认'}
-              </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+          confirmText={deleting ? '删除中...' : '确认'}
+          onClose={() => !deleting && setDeleteTarget(null)}
+          onConfirm={handleDeleteConfirm}
+        />
       )}
     </div>
   )

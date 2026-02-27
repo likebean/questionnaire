@@ -204,6 +204,54 @@ export const departmentsApi = {
     apiClient.delete(`/departments/${id}`) as Promise<ApiResponse<null>>,
 }
 
+// ---------- 预定义选项库（系统管理） ----------
+export interface PresetOptionItemVO {
+  id?: number
+  sortOrder?: number
+  label: string
+  allowFill?: boolean
+  description?: string | null
+  descriptionOpenInPopup?: boolean
+  imageUrl?: string | null
+}
+
+export interface PresetOptionGroupVO {
+  id: number
+  category: string
+  name: string
+  sort?: number | null
+  enabled?: boolean | null
+}
+
+export interface PresetOptionGroupDetailVO {
+  id: number
+  category: string
+  name: string
+  sort?: number | null
+  enabled?: boolean | null
+  items: PresetOptionItemVO[]
+}
+
+export interface PresetOptionCategoryVO {
+  category: string
+  groups: PresetOptionGroupDetailVO[]
+}
+
+export const presetOptionsApi = {
+  getTree: () =>
+    apiClient.get('/preset-options/tree') as Promise<ApiResponse<PresetOptionCategoryVO[]>>,
+  query: (params?: { keyword?: string; category?: string; page?: number; pageSize?: number }) =>
+    apiClient.get('/preset-options/query', { params }) as Promise<ApiResponse<PaginatedResponse<PresetOptionGroupVO>>>,
+  getDetail: (id: number) =>
+    apiClient.get(`/preset-options/${id}`) as Promise<ApiResponse<PresetOptionGroupDetailVO>>,
+  create: (data: { category: string; name: string; sort?: number; enabled?: boolean; items?: PresetOptionItemVO[] }) =>
+    apiClient.post('/preset-options', data) as Promise<ApiResponse<number>>,
+  update: (id: number, data: { category?: string; name?: string; sort?: number; enabled?: boolean; items?: PresetOptionItemVO[] }) =>
+    apiClient.put(`/preset-options/${id}`, data) as Promise<ApiResponse<null>>,
+  delete: (id: number) =>
+    apiClient.delete(`/preset-options/${id}`) as Promise<ApiResponse<null>>,
+}
+
 // ---------- 问卷 ----------
 export interface SurveyListItemVO {
   id: string

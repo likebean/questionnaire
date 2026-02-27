@@ -21,9 +21,11 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import {
   surveysApi,
+  presetOptionsApi,
   type SurveyDetailVO,
   type SurveyQuestionVO,
   type ApiResponse,
+  type PresetOptionCategoryVO,
 } from '@/services/api'
 
 const inputClass =
@@ -543,10 +545,28 @@ function QuestionEditor({
   const options = getOptions(config)
   const [showBatchAdd, setShowBatchAdd] = useState(false)
   const [batchAddText, setBatchAddText] = useState('')
+  const [presetTree, setPresetTree] = useState<PresetOptionCategoryVO[] | null>(null)
+  const [presetLoading, setPresetLoading] = useState(false)
+  const [presetLoadError, setPresetLoadError] = useState<string | null>(null)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor)
   )
+
+  useEffect(() => {
+    if (!showBatchAdd) return
+    if (presetTree || presetLoading) return
+    setPresetLoading(true)
+    setPresetLoadError(null)
+    presetOptionsApi
+      .getTree()
+      .then((res) => {
+        if (res?.code === 200) setPresetTree(res.data ?? [])
+        else setPresetLoadError(res?.message || '加载预定义选项失败')
+      })
+      .catch((e) => setPresetLoadError(e?.response?.data?.message || '加载预定义选项失败'))
+      .finally(() => setPresetLoading(false))
+  }, [showBatchAdd, presetTree, presetLoading])
 
   const setConfig = (key: string, value: unknown) => {
     const next = { ...config, [key]: value }
@@ -738,30 +758,73 @@ function QuestionEditor({
             </button>
           </div>
           {showBatchAdd && (
-            <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-              <label className={labelClass}>每行一个选项，可直接粘贴 Excel 列或文本</label>
-              <textarea
-                value={batchAddText}
-                onChange={(e) => setBatchAddText(e.target.value)}
-                className={inputClass + ' mt-1'}
-                rows={6}
-                placeholder="每行一个选项，可从 Excel 或文档中复制多行粘贴"
-              />
-              <div className="mt-2 flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleBatchAddOptions}
-                  className="px-4 py-2 rounded-lg font-medium bg-blue-600 text-white hover:bg-blue-700 text-sm"
-                >
-                  确定添加
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setShowBatchAdd(false); setBatchAddText('') }}
-                  className="px-4 py-2 rounded-lg font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 text-sm"
-                >
-                  取消
-                </button>
+            <div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                  <label className={labelClass}>每行一个选项，可直接粘贴 Excel 列或文本</label>
+                  <textarea
+                    value={batchAddText}
+                    onChange={(e) => setBatchAddText(e.target.value)}
+                    className={inputClass + ' mt-1'}
+                    rows={6}
+                    placeholder="每行一个选项，可从 Excel 或文档中复制多行粘贴"
+                  />
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleBatchAddOptions}
+                      className="px-4 py-2 rounded-lg font-medium bg-blue-600 text-white hover:bg-blue-700 text-sm"
+                    >
+                      确定添加
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowBatchAdd(false); setBatchAddText('') }}
+                      className="px-4 py-2 rounded-lg font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 text-sm"
+                    >
+                      取消
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-sm font-medium text-gray-700 mb-3">预定义选项</div>
+                  <p className="text-xs text-gray-500 mb-3">点击按钮将选项写入左侧文本框，再点「确定添加」生效。</p>
+                  {presetLoading ? (
+                    <div className="text-sm text-gray-500">加载中...</div>
+                  ) : presetLoadError ? (
+                    <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                      {presetLoadError}
+                    </div>
+                  ) : !presetTree?.length ? (
+                    <div className="text-sm text-gray-500">暂无预定义选项（可在系统管理中维护）</div>
+                  ) : (
+                    <div className="max-h-[260px] overflow-auto">
+                      <div className="grid grid-cols-4 gap-2">
+                        {presetTree.flatMap((cat) =>
+                          (cat.groups ?? []).map((g) => (
+                            <button
+                              key={g.id}
+                              type="button"
+                              onClick={() => {
+                                const lines = (g.items ?? [])
+                                  .map((it) => (it.label ?? '').trim())
+                                  .filter((s) => s.length > 0)
+                                  .join('\n')
+                                if (!lines) return
+                                setBatchAddText(lines)
+                              }}
+                              className="px-2 py-1.5 rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 text-sm text-center truncate"
+                              title={`${cat.category} - ${g.name}`}
+                            >
+                              {g.name}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}

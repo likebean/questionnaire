@@ -21,6 +21,7 @@ export default function Menu() {
     { href: '/departments', icon: 'fas fa-sitemap', label: '院系管理' },
     { href: '/roles', icon: 'fas fa-user-tag', label: '角色管理' },
     { href: '/permissions', icon: 'fas fa-shield-alt', label: '权限管理' },
+    { href: '/preset-options', icon: 'fas fa-list-check', label: '预定义选项' },
   ]
 
   const groups: { group: string; items: typeof mainItems }[] = [
