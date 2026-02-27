@@ -499,11 +499,6 @@ if (previewMode) {
           预览模式：仅查看填写效果，提交不会保存答卷。
         </div>
       )}
-      {viewMode && (
-        <div className="max-w-2xl mx-auto mb-4 px-4 py-2 bg-slate-100 border border-slate-200 rounded-lg text-slate-700 text-sm text-center">
-          答卷查看（只读）
-        </div>
-      )}
       <div className="fill-page-surveyjs fill-page-card w-full max-w-2xl mx-auto bg-white rounded-xl shadow-card overflow-hidden">
         <Survey
           model={surveyModel}

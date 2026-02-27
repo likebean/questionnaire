@@ -92,6 +92,8 @@ export default function ResponsesPage() {
                   <td className="px-6 py-4">
                     <Link
                       href={`/fill/${id}?responseId=${r.id}&mode=view`}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="text-blue-600 hover:underline text-sm"
                     >
                       查看

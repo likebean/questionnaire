@@ -611,7 +611,7 @@ test.describe('问卷流程', () => {
     }
 
     await page.goto(`/fill/${surveyId}?responseId=${responseId}&mode=view`)
-    await expect(page.getByText('答卷查看（只读）')).toBeVisible({ timeout: 15000 })
+    await expect(page.getByRole('link', { name: '返回答卷列表' })).toBeVisible({ timeout: 15000 })
     await expect(page.getByText('预览模式：仅查看填写效果，提交不会保存答卷。')).not.toBeVisible()
   })
 })
