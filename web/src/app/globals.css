@@ -26,6 +26,10 @@ textarea:not(.surveyjs-root *):not(.sd-root-modern *),
 .rounded-xl:not(.surveyjs-root *):not(.sd-root-modern *) {
   border-radius: 0.75rem;
 }
+/* 题目悬浮操作按钮：小圆角，强制覆盖全局大圆角 */
+.edit-question-actions button {
+  border-radius: 2px !important;
+}
 .table-modern th {
   background-color: #f3f4f6;
   font-weight: 600;
