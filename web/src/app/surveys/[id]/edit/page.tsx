@@ -179,22 +179,22 @@ function SortableQuestionCard({
         (isDragging ? ' opacity-60 z-10' : '')
       }
     >
-      <div
-        data-no-edit
-        className="flex justify-center py-1.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto"
-      >
-        <button
-          type="button"
-          className="p-1.5 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing touch-none rounded hover:bg-gray-100"
-          title="拖拽排序"
-          {...attributes}
-          {...listeners}
-        >
-          <i className="fas fa-grip-vertical text-sm" />
-        </button>
-      </div>
       {isEditing ? (
-        <div className="px-4 pb-4 pt-3 bg-gray-50/50 relative">
+        <div className="px-4 pb-4 pt-10 bg-gray-50/50 relative">
+          <div
+            data-no-edit
+            className="absolute top-0 left-0 right-0 flex justify-center pt-1.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto z-[1]"
+          >
+            <button
+              type="button"
+              className="p-1.5 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing touch-none rounded hover:bg-gray-100/80"
+              title="拖拽排序"
+              {...attributes}
+              {...listeners}
+            >
+              <i className="fas fa-grip-vertical text-sm" />
+            </button>
+          </div>
           <QuestionEditor
             surveyId={surveyId}
             question={question}
@@ -218,6 +218,20 @@ function SortableQuestionCard({
         </div>
       ) : (
         <div className="edit-question-preview hover:bg-gray-50/50 relative">
+          <div
+            data-no-edit
+            className="absolute top-0 left-0 right-0 flex justify-center pt-1.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto z-[1]"
+          >
+            <button
+              type="button"
+              className="p-1.5 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing touch-none rounded hover:bg-gray-100/80"
+              title="拖拽排序"
+              {...attributes}
+              {...listeners}
+            >
+              <i className="fas fa-grip-vertical text-sm" />
+            </button>
+          </div>
           <QuestionFillPreview question={question} index={index} />
           <div
             data-no-edit
