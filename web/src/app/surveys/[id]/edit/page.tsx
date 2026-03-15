@@ -31,6 +31,7 @@ import {
   type PresetOptionCategoryVO,
 } from '@/services/api'
 import { singleQuestionToSurveyJson } from '@/lib/surveyJson'
+import { RichTitleEditor } from '@/app/_components/RichTitleEditor'
 import 'survey-core/survey-core.min.css'
 import '@/app/fill/fill.css'
 
@@ -141,6 +142,7 @@ function SortableQuestionCard({
   onMoveDown,
   onMoveFirst,
   onMoveLast,
+  onFinishEdit,
 }: {
   question: SurveyQuestionVO
   index: number
@@ -156,6 +158,7 @@ function SortableQuestionCard({
   onMoveDown: () => void
   onMoveFirst: () => void
   onMoveLast: () => void
+  onFinishEdit: () => void
 }) {
   const id = `q-${question.id}`
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
@@ -166,21 +169,13 @@ function SortableQuestionCard({
   const canMoveUp = index > 0
   const canMoveDown = index < totalCount - 1
 
-  const handleCardClick = (e: React.MouseEvent) => {
-    if (isEditing) return
-    const target = e.target as HTMLElement
-    if (target.closest('[data-no-edit]')) return
-    onStartEdit()
-  }
-
   return (
     <div
       ref={setNodeRef}
       style={style}
-      onClick={!isEditing ? handleCardClick : undefined}
       className={
         'group bg-white border-b border-gray-200 overflow-hidden ' +
-        (isEditing ? ' border-l-4 border-l-blue-500 bg-blue-50/30' : ' cursor-pointer hover:bg-gray-50/50 ') +
+        (isEditing ? ' border-l-4 border-l-blue-500 bg-blue-50/30' : ' hover:bg-gray-50/50 ') +
         (isDragging ? ' opacity-60 z-10' : '')
       }
     >
@@ -229,7 +224,7 @@ function SortableQuestionCard({
         </div>
       )}
       {isEditing ? (
-        <div className="px-4 pb-4 pt-3 bg-gray-50/50">
+        <div className="px-4 pb-4 pt-3 bg-gray-50/50 relative">
           <QuestionEditor
             surveyId={surveyId}
             question={question}
@@ -239,6 +234,17 @@ function SortableQuestionCard({
             hideActions
             compact
           />
+          <div className="edit-question-actions absolute right-5 bottom-5">
+            <button
+              type="button"
+              onClick={onFinishEdit}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
+              style={{ borderRadius: 2 }}
+            >
+              <i className="fas fa-check text-[11px] opacity-90" />
+              <span>完成编辑</span>
+            </button>
+          </div>
         </div>
       ) : (
         <div className="edit-question-preview hover:bg-gray-50/50 relative">
@@ -735,6 +741,7 @@ export default function EditSurveyPage() {
                         onMoveDown={() => handleMoveQuestionDown(i)}
                         onMoveFirst={() => handleMoveQuestionFirst(i)}
                         onMoveLast={() => handleMoveQuestionLast(i)}
+                        onFinishEdit={() => setEditingId(null)}
                       />
                     )
                   })
@@ -820,17 +827,19 @@ function QuestionEditor({
 
   const compactInputClass = 'block w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
 
+  const typeLabel = TYPES.find((t) => t.value === question.type)?.label ?? question.type
+
   if (compact) {
     return (
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-3">
-          <input
-            type="text"
-            value={question.title}
-            onChange={(e) => onUpdate({ title: e.target.value })}
-            className={compactInputClass + ' flex-1 min-w-[200px]'}
-            placeholder="问题名称"
-          />
+          <div className="flex-1 min-w-[200px]">
+            <RichTitleEditor
+              value={question.title ?? ''}
+              onChange={(html) => onUpdate({ title: html })}
+              placeholder="问题名称"
+            />
+          </div>
           <label className="flex items-center gap-1.5 text-sm text-gray-600 shrink-0">
             <input
               type="checkbox"
@@ -840,15 +849,7 @@ function QuestionEditor({
             />
             必填
           </label>
-          <select
-            value={question.type}
-            onChange={(e) => onUpdate({ type: e.target.value })}
-            className={compactInputClass + ' w-28'}
-          >
-            {TYPES.map((t) => (
-              <option key={t.value} value={t.value}>{t.label}</option>
-            ))}
-          </select>
+          <span className="text-sm text-gray-500 shrink-0 px-2 py-1.5">{typeLabel}</span>
         </div>
         <input
           type="text"
@@ -970,11 +971,11 @@ function QuestionEditor({
       )}
       <div className="mb-4">
         <label className={labelClass}>题目标题</label>
-        <input
-          type="text"
-          value={question.title}
-          onChange={(e) => onUpdate({ title: e.target.value })}
-          className={inputClass}
+        <RichTitleEditor
+          value={question.title ?? ''}
+          onChange={(html) => onUpdate({ title: html })}
+          placeholder="问题名称"
+          className="mt-1"
         />
       </div>
       <div className="mb-4">
@@ -988,17 +989,7 @@ function QuestionEditor({
       </div>
       <div className="mb-4">
         <label className={labelClass}>题型</label>
-        <select
-          value={question.type}
-          onChange={(e) => onUpdate({ type: e.target.value })}
-          className={inputClass}
-        >
-          {TYPES.map((t) => (
-            <option key={t.value} value={t.value}>
-              {t.label}
-            </option>
-          ))}
-        </select>
+        <p className="text-sm text-gray-600 mt-1">{typeLabel}</p>
       </div>
       <div className="mb-4">
         <label className="inline-flex items-center gap-2 text-sm text-gray-600">

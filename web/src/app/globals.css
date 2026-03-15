@@ -61,6 +61,48 @@ textarea:not(.surveyjs-root *):not(.sd-root-modern *),
 .status-badge.danger { background-color: rgba(239, 68, 68, 0.1); color: #ef4444; }
 .status-badge.info { background-color: rgba(59, 130, 246, 0.1); color: #3b82f6; }
 
+/* 题目标题：单一 Quill 实例，显示/编辑态仅切换 readOnly 与样式，避免文字跳变与布局差 */
+.rich-title-quill {
+  min-height: 6.5rem;
+}
+.rich-title-quill .ql-toolbar.ql-snow {
+  padding: 4px 8px;
+  border-color: #e5e7eb;
+  border-radius: 6px 6px 0 0;
+  background: #f9fafb;
+}
+.rich-title-quill .ql-container.ql-snow {
+  border-color: #e5e7eb;
+  border-radius: 0 0 6px 6px;
+  font-size: 0.875rem;
+  min-height: 2.5rem;
+}
+.rich-title-quill .ql-editor {
+  min-height: 2.5rem;
+  padding: 6px 10px;
+}
+.rich-title-quill .ql-editor.ql-blank::before {
+  color: #9ca3af;
+  font-style: normal;
+}
+
+/* 显示态：隐藏工具栏但保留占位，去掉边框与背景，内容位置不变 */
+.rich-title-quill--display .ql-toolbar.ql-snow {
+  visibility: hidden;
+  pointer-events: none;
+}
+.rich-title-quill--display .ql-container.ql-snow {
+  border-color: transparent;
+  background: transparent;
+}
+.rich-title-quill--display .ql-editor {
+  border: none;
+  background: transparent;
+}
+.rich-title-quill--display .ql-editor:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
 /* 与 ai-plugin 一致 */
 .shadow-card {
   box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05), 0 4px 6px -2px rgba(0,0,0,0.025);
