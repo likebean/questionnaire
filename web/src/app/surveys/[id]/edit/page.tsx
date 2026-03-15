@@ -179,50 +179,20 @@ function SortableQuestionCard({
         (isDragging ? ' opacity-60 z-10' : '')
       }
     >
-      {isEditing && (
-        <div className="flex items-start gap-3 px-3 py-2 border-b border-gray-100">
-          <div data-no-edit className="flex flex-col items-center gap-1 shrink-0 pt-1">
-            <button
-              type="button"
-              className="p-2 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing touch-none rounded hover:bg-gray-100"
-              title="拖拽排序"
-              {...attributes}
-              {...listeners}
-            >
-              <i className="fas fa-grip-vertical" />
-            </button>
-          </div>
-          <div className="flex-1 min-w-0 flex items-center gap-2">
-            <span className="text-xs font-semibold text-gray-500 shrink-0">
-              #{index + 1}
-            </span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-[11px] font-medium shrink-0">
-              {typeLabel}
-            </span>
-            <span className="text-sm text-gray-800 truncate">
-              {question.title || '未命名题目'}
-            </span>
-          </div>
-          <div data-no-edit className="flex flex-col gap-1 shrink-0 pl-2">
-            <button
-              type="button"
-              onClick={onCopy}
-              className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-              title="复制题目"
-            >
-              <i className="fas fa-copy" />
-            </button>
-            <button
-              type="button"
-              onClick={onDelete}
-              className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              title="删除此题"
-            >
-              <i className="fas fa-trash" />
-            </button>
-          </div>
-        </div>
-      )}
+      <div
+        data-no-edit
+        className="flex justify-center py-1.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto"
+      >
+        <button
+          type="button"
+          className="p-1.5 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing touch-none rounded hover:bg-gray-100"
+          title="拖拽排序"
+          {...attributes}
+          {...listeners}
+        >
+          <i className="fas fa-grip-vertical text-sm" />
+        </button>
+      </div>
       {isEditing ? (
         <div className="px-4 pb-4 pt-3 bg-gray-50/50 relative">
           <QuestionEditor
@@ -851,13 +821,6 @@ function QuestionEditor({
           </label>
           <span className="text-sm text-gray-500 shrink-0 px-2 py-1.5">{typeLabel}</span>
         </div>
-        <input
-          type="text"
-          value={question.description ?? ''}
-          onChange={(e) => onUpdate({ description: e.target.value || undefined })}
-          className={compactInputClass + ' w-full'}
-          placeholder="题目说明（选填）"
-        />
         {(question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE') && (
           <>
             <DndContext
@@ -976,15 +939,6 @@ function QuestionEditor({
           onChange={(html) => onUpdate({ title: html })}
           placeholder="问题名称"
           className="mt-1"
-        />
-      </div>
-      <div className="mb-4">
-        <label className={labelClass}>题目说明（选填）</label>
-        <input
-          type="text"
-          value={question.description ?? ''}
-          onChange={(e) => onUpdate({ description: e.target.value || undefined })}
-          className={inputClass}
         />
       </div>
       <div className="mb-4">
