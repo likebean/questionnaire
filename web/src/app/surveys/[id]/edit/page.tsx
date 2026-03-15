@@ -827,7 +827,7 @@ function QuestionEditor({
 
   if (compact) {
     return (
-      <div className="space-y-3">
+      <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex-1 min-w-[200px]">
             <RichTitleEditor
@@ -880,11 +880,14 @@ function QuestionEditor({
               <button type="button" onClick={() => setShowBatchAdd((v) => !v)} className="text-blue-600 hover:underline text-sm">
                 批量添加选项
               </button>
-              <label className="flex items-center gap-1.5 text-sm text-gray-600">
-                <input type="checkbox" checked={config.optionsRandom === true} onChange={(e) => setConfig('optionsRandom', e.target.checked)} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                随机
-              </label>
-              <select value={(config.layout as string) ?? 'vertical'} onChange={(e) => setConfig('layout', e.target.value)} className={compactInputClass + ' w-20 py-1'}><option value="vertical">竖向</option><option value="horizontal">横向</option></select>
+              <select value={config.optionsRandom === true ? 'random' : 'fixed'} onChange={(e) => setConfig('optionsRandom', e.target.value === 'random')} className="inline-block w-32 shrink-0 rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500" title="选项随机">
+                <option value="fixed">选项不随机排列</option>
+                <option value="random">选项随机排列</option>
+              </select>
+              <select value={(config.layout as string) ?? 'vertical'} onChange={(e) => setConfig('layout', e.target.value)} className="inline-block w-28 shrink-0 rounded border border-gray-300 bg-white px-2 py-1 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                <option value="vertical">竖向排列</option>
+                <option value="horizontal">横向排列</option>
+              </select>
             </div>
             {showBatchAdd && (
               <div className="mt-2 p-3 bg-white rounded-lg border border-gray-200">
@@ -975,24 +978,26 @@ function QuestionEditor({
       {(question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE') && (
         <div className="mb-4">
           <div className="flex flex-wrap gap-4 mb-3">
-            <label className="flex items-center gap-2 text-sm text-gray-600">
-              <input
-                type="checkbox"
-                checked={config.optionsRandom === true}
-                onChange={(e) => setConfig('optionsRandom', e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              选项随机
-            </label>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600 whitespace-nowrap">选项顺序：</span>
+              <select
+                value={config.optionsRandom === true ? 'random' : 'fixed'}
+                onChange={(e) => setConfig('optionsRandom', e.target.value === 'random')}
+                className={inputClass + ' w-36 py-1'}
+              >
+                <option value="fixed">选项不随机排列</option>
+                <option value="random">选项随机排列</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600 whitespace-nowrap">排列：</span>
               <select
                 value={(config.layout as string) ?? 'vertical'}
                 onChange={(e) => setConfig('layout', e.target.value)}
                 className={inputClass + ' w-28 py-1'}
               >
-                <option value="vertical">竖向</option>
-                <option value="horizontal">横向</option>
+                <option value="vertical">竖向排列</option>
+                <option value="horizontal">横向排列</option>
               </select>
             </div>
             <label className="flex items-center gap-2 text-sm text-gray-600">
