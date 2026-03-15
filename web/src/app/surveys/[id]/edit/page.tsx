@@ -180,7 +180,7 @@ function SortableQuestionCard({
       }
     >
       {isEditing ? (
-        <div className="px-4 pb-4 pt-10 bg-gray-50/50 relative">
+        <div className="px-4 pt-10 pb-0 bg-gray-50/50 relative">
           <div
             data-no-edit
             className="absolute top-0 left-0 right-0 flex justify-center pt-1.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto z-[1]"
@@ -204,11 +204,23 @@ function SortableQuestionCard({
             hideActions
             compact
           />
-          <div className="edit-question-actions absolute right-5 bottom-5">
+          <div className="mt-4 pt-3 pb-3 border-t border-gray-200/50 bg-gray-100/30 -mx-4 px-4 flex flex-wrap items-center justify-between gap-3 rounded-b">
+            <div className="flex flex-wrap items-center gap-4">
+              <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={question.required !== false}
+                  onChange={(e) => onUpdate({ required: e.target.checked })}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                必填
+              </label>
+              <span className="text-sm text-gray-500">{typeLabel}</span>
+            </div>
             <button
               type="button"
               onClick={onFinishEdit}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors shrink-0"
               style={{ borderRadius: 2 }}
             >
               <i className="fas fa-check text-[11px] opacity-90" />
@@ -824,16 +836,6 @@ function QuestionEditor({
               placeholder="问题名称"
             />
           </div>
-          <label className="flex items-center gap-1.5 text-sm text-gray-600 shrink-0">
-            <input
-              type="checkbox"
-              checked={question.required !== false}
-              onChange={(e) => onUpdate({ required: e.target.checked })}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            必填
-          </label>
-          <span className="text-sm text-gray-500 shrink-0 px-2 py-1.5">{typeLabel}</span>
         </div>
         {(question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE') && (
           <>
