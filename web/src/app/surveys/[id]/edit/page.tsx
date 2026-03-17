@@ -1142,7 +1142,10 @@ function QuestionEditor({
       .split(/\r?\n/)
       .map((s) => s.trim())
       .filter((s) => s.length > 0)
-    if (lines.length === 0) return
+    if (lines.length === 0) {
+      alert('请至少输入一个选项')
+      return
+    }
     const newOpts: OptionItem[] = lines.map((label, i) => ({
       sortOrder: options.length + i,
       label,
@@ -1150,6 +1153,11 @@ function QuestionEditor({
     setOptions([...options, ...newOpts])
     setBatchAddText('')
     setShowBatchAdd(false)
+  }
+
+  const closeBatchAddDialog = () => {
+    setShowBatchAdd(false)
+    setBatchAddText('')
   }
 
   const compactInputClass = 'block w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
@@ -1267,6 +1275,65 @@ function QuestionEditor({
     </OptionEditDialog>
   )
 
+  const batchAddDialogNode = (
+    <OptionEditDialog
+      open={showBatchAdd}
+      title="批量添加选项"
+      onClose={closeBatchAddDialog}
+      onSave={handleBatchAddOptions}
+      saveText="确定添加"
+    >
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2">
+          <label className={labelClass}>每行一个选项，可直接粘贴 Excel 列或文本</label>
+          <textarea
+            value={batchAddText}
+            onChange={(e) => setBatchAddText(e.target.value)}
+            className={inputClass + ' mt-1'}
+            rows={8}
+            placeholder="每行一个选项，可从 Excel 或文档中复制多行粘贴"
+          />
+          <p className="mt-2 text-xs text-gray-500">点击右侧预定义项会覆盖左侧文本框内容，再点「确定添加」生效。</p>
+        </div>
+        <div>
+          <div className="text-sm font-medium text-gray-700 mb-3">预定义选项</div>
+          {presetLoading ? (
+            <div className="text-sm text-gray-500">加载中...</div>
+          ) : presetLoadError ? (
+            <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">{presetLoadError}</div>
+          ) : !presetTree?.length ? (
+            <div className="text-sm text-gray-500">暂无预定义选项</div>
+          ) : (
+            <div className="max-h-[260px] overflow-auto">
+              <div className="grid grid-cols-4 gap-2">
+                {presetTree.flatMap((cat) =>
+                  (cat.groups ?? []).map((g) => (
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() => {
+                        const lines = (g.items ?? [])
+                          .map((it) => stripHtml(it.label ?? '').trim())
+                          .filter((s) => s.length > 0)
+                          .join('\n')
+                        if (!lines) return
+                        setBatchAddText(lines)
+                      }}
+                      className="px-2 py-1.5 rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 text-sm text-center truncate"
+                      title={`${cat.category} - ${g.name}`}
+                    >
+                      {g.name}
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </OptionEditDialog>
+  )
+
   const optionsEditor = (
     <div style={flatLightThemeStyle}>
       <DndContext
@@ -1303,7 +1370,7 @@ function QuestionEditor({
           ))}
         </SortableContext>
       </DndContext>
-      <div className={`flex flex-wrap items-center gap-2 ${compact ? 'pt-0.5 border-t border-gray-100' : ''}`}>
+      <div className={`flex flex-wrap items-center gap-2 ${compact ? 'mt-2 pt-2 border-t border-gray-100' : ''}`}>
         <button
           type="button"
           onClick={() => addOptionAt(null)}
@@ -1320,80 +1387,12 @@ function QuestionEditor({
         </button>
         <button
           type="button"
-          onClick={() => setShowBatchAdd((v) => !v)}
+          onClick={() => setShowBatchAdd(true)}
           className="text-blue-600 hover:underline text-sm"
         >
           批量添加选项
         </button>
       </div>
-      {showBatchAdd && (
-        <div className={`mt-3 ${compact ? 'p-3 bg-white' : 'p-4 bg-gray-50'} rounded-lg border border-gray-200`}>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2">
-              <label className={compact ? 'text-xs text-gray-600 mb-1' : labelClass}>每行一个选项，可直接粘贴 Excel 列或文本</label>
-              <textarea
-                value={batchAddText}
-                onChange={(e) => setBatchAddText(e.target.value)}
-                className={(compact ? compactInputClass : inputClass) + ' mt-1'}
-                rows={compact ? 4 : 6}
-                placeholder="每行一个选项，可从 Excel 或文档中复制多行粘贴"
-              />
-              <div className="mt-2 flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleBatchAddOptions}
-                  className="px-4 py-2 rounded-lg font-medium bg-blue-600 text-white hover:bg-blue-700 text-sm"
-                >
-                  确定添加
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setShowBatchAdd(false); setBatchAddText('') }}
-                  className="px-4 py-2 rounded-lg font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 text-sm"
-                >
-                  取消
-                </button>
-              </div>
-            </div>
-            <div>
-              <div className="text-sm font-medium text-gray-700 mb-3">预定义选项</div>
-              {!compact && <p className="text-xs text-gray-500 mb-3">点击按钮将选项写入左侧文本框，再点「确定添加」生效。</p>}
-              {presetLoading ? (
-                <div className="text-sm text-gray-500">加载中...</div>
-              ) : presetLoadError ? (
-                <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">{presetLoadError}</div>
-              ) : !presetTree?.length ? (
-                <div className="text-sm text-gray-500">暂无预定义选项</div>
-              ) : (
-                <div className={compact ? 'grid grid-cols-4 gap-1.5 max-h-32 overflow-auto' : 'max-h-[260px] overflow-auto'}>
-                  <div className={compact ? '' : 'grid grid-cols-4 gap-2'}>
-                    {presetTree.flatMap((cat) =>
-                      (cat.groups ?? []).map((g) => (
-                        <button
-                          key={g.id}
-                          type="button"
-                          onClick={() => {
-                            const lines = (g.items ?? [])
-                              .map((it) => stripHtml(it.label ?? '').trim())
-                              .filter((s) => s.length > 0)
-                              .join('\n')
-                            if (!lines) return
-                            setBatchAddText(lines)
-                          }}
-                          className={compact ? 'px-2 py-1 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 text-xs truncate' : 'px-2 py-1.5 rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 text-sm text-center truncate'}
-                          title={`${cat.category} - ${g.name}`}
-                        >
-                          {g.name}
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 
@@ -1439,6 +1438,7 @@ function QuestionEditor({
           </div>
         )}
         {optionDialogNode}
+        {batchAddDialogNode}
       </div>
     )
   }
@@ -1652,6 +1652,7 @@ function QuestionEditor({
         </div>
       )}
       {optionDialogNode}
+      {batchAddDialogNode}
     </div>
   )
 }
