@@ -1203,6 +1203,7 @@ function QuestionEditor({
             value={labelDraft}
             onChange={setLabelDraft}
             placeholder={`选项${(optionDialog?.index ?? 0) + 1}`}
+            autoFocus
           />
         </div>
       )}

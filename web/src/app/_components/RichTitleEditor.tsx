@@ -24,15 +24,18 @@ export function RichTitleEditor({
   onChange,
   placeholder = '问题名称',
   className = '',
+  autoFocus = false,
 }: {
   value: string
   onChange: (html: string) => void
   placeholder?: string
   className?: string
+  autoFocus?: boolean
 }) {
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState(value)
   const containerRef = useRef<HTMLDivElement>(null)
+  const quillRef = useRef<any>(null)
   const lastHtmlRef = useRef(value)
   /** 在 mousedown 里因“点击区域外”调用 saveAndExit 后，同一次操作仍会触发 click，用此 ref 忽略下一次 onClick 避免重新进入编辑态 */
   const ignoreNextClickRef = useRef(false)
@@ -40,6 +43,23 @@ export function RichTitleEditor({
   useEffect(() => {
     setEditValue(sanitizeRichTextHtml(value))
   }, [value])
+
+  useEffect(() => {
+    if (!autoFocus) return
+    setIsEditing(true)
+    const timer = window.setTimeout(() => {
+      const editor = quillRef.current?.getEditor?.()
+      if (editor) {
+        editor.focus()
+        const len = editor.getLength?.() ?? 0
+        editor.setSelection?.(Math.max(0, len - 1), 0, 'silent')
+        return
+      }
+      const fallback = containerRef.current?.querySelector('.ql-editor') as HTMLElement | null
+      fallback?.focus()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [autoFocus])
 
   const saveAndExit = useCallback(() => {
     const sanitized = sanitizeRichTextHtml(lastHtmlRef.current)
@@ -110,6 +130,7 @@ export function RichTitleEditor({
       className={`rich-title-quill w-full ${!isEditing ? 'rich-title-quill--display' : ''} ${className}`}
     >
       <ReactQuill
+        ref={quillRef}
         theme="snow"
         value={editValue}
         onChange={(val, delta, source, editor) => {
