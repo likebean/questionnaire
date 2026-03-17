@@ -51,7 +51,7 @@ test.describe('填写页 允许填空（无隐藏题）', () => {
                   surveyId,
                   sortOrder: 0,
                   type: 'SINGLE_CHOICE',
-                  title: '请选择一项',
+                  title: '<p><strong>请选择一项</strong></p>',
                   required: true,
                   config: JSON.stringify({
                     layout: 'vertical',
@@ -108,6 +108,27 @@ test.describe('填写页 允许填空（无隐藏题）', () => {
 
     await page.goto(`/fill/${surveyId}`, { waitUntil: 'networkidle' })
     await expect(page.getByRole('button', { name: '提交' })).toBeVisible({ timeout: 15000 })
+    const titleNumber = page.locator('.fill-page-surveyjs .sd-question__title .sd-element__num').first()
+    const titleText = page.locator('.fill-page-surveyjs .sd-question__title .sv-string-viewer').first()
+    const titleStar = page.locator('.fill-page-surveyjs .sd-question__title .sd-question__required-text').first()
+    await expect(titleNumber).toBeVisible()
+    await expect(titleText).toBeVisible()
+    await expect(titleStar).toBeVisible()
+    const fillTitleFont = await titleText.evaluate((el) => getComputedStyle(el).fontSize)
+    const fillNumberFont = await titleNumber.evaluate((el) => getComputedStyle(el).fontSize)
+    expect(fillNumberFont).toBe(fillTitleFont)
+    const fillTitleNumberBox = await titleNumber.boundingBox()
+    const fillTitleTextBox = await titleText.boundingBox()
+    const fillTitleStarBox = await titleStar.boundingBox()
+    expect(fillTitleNumberBox).not.toBeNull()
+    expect(fillTitleTextBox).not.toBeNull()
+    expect(fillTitleStarBox).not.toBeNull()
+    if (fillTitleNumberBox && fillTitleTextBox) {
+      expect(Math.abs(fillTitleNumberBox.y - fillTitleTextBox.y)).toBeLessThan(6)
+    }
+    if (fillTitleStarBox && fillTitleTextBox) {
+      expect(Math.abs(fillTitleStarBox.y - fillTitleTextBox.y)).toBeLessThan(6)
+    }
 
     // 若没有隐藏题，页面中只应有一条题目（单选题本体）
     await expect(page.locator('.fill-page-surveyjs .sd-question')).toHaveCount(1)

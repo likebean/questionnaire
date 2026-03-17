@@ -135,6 +135,8 @@ function QuestionFillPreview({ question, index }: { question: SurveyQuestionVO; 
     applySurveyRichTextRenderer(model)
     model.onAfterRenderQuestion.add((_sender, options) => {
       const q = options.question
+      const numberEl = options.htmlElement?.querySelector('.sd-element__num') as HTMLElement | null
+      if (numberEl) numberEl.textContent = `${index + 1}.`
       if (typeof q.name === 'string' && q.name.endsWith('-Comment')) {
         options.htmlElement?.classList.add('fill-option-inline-hidden')
         return
@@ -154,7 +156,7 @@ function QuestionFillPreview({ question, index }: { question: SurveyQuestionVO; 
     model.showNavigationButtons = false
     model.showCompletedPage = false
     return model
-  }, [question])
+  }, [question, index])
   return (
     <div
       className="fill-page-card fill-page-surveyjs w-full bg-white overflow-hidden select-none"
@@ -241,6 +243,7 @@ function SortableQuestionCard({
           <QuestionEditor
             surveyId={surveyId}
             question={question}
+            questionNo={index + 1}
             onUpdate={onUpdate}
             onDelete={onDelete}
             onCopy={onCopy}
@@ -909,6 +912,7 @@ export default function EditSurveyPage() {
 function QuestionEditor({
   surveyId,
   question,
+  questionNo,
   onUpdate,
   onDelete,
   onCopy,
@@ -918,6 +922,7 @@ function QuestionEditor({
 }: {
   surveyId: string
   question: SurveyQuestionVO
+  questionNo?: number
   onUpdate: (patch: Partial<SurveyQuestionVO>) => void
   onDelete: () => void
   onCopy: () => void
@@ -1418,7 +1423,10 @@ function QuestionEditor({
   if (compact) {
     return (
       <div className="space-y-0.5">
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-start gap-1.5">
+          {questionNo != null && (
+            <span className="question-title-number mt-8 text-sm font-semibold leading-6 text-gray-700 select-none">{questionNo}.</span>
+          )}
           <div className="flex-1 min-w-[200px]">
             <RichTitleEditor
               value={question.title ?? ''}

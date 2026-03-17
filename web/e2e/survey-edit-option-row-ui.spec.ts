@@ -60,7 +60,7 @@ test.describe('问卷编辑页 选项行 UI', () => {
                   surveyId,
                   sortOrder: 0,
                   type: 'SINGLE_CHOICE',
-                  title: '你最喜欢的颜色是？',
+                  title: '<p><strong>你最喜欢的颜色是？</strong></p>',
                   required: true,
                   config: JSON.stringify({
                     layout: 'vertical',
@@ -97,6 +97,21 @@ test.describe('问卷编辑页 选项行 UI', () => {
     await page.goto(`/surveys/${surveyId}/edit`, { waitUntil: 'networkidle' })
     await expect(page.getByRole('heading', { name: '编辑问卷' })).toBeVisible({ timeout: 15000 })
     await expect(optionItem()).toHaveCount(3)
+    const editTitleNumber = page.locator('.question-title-number').first()
+    await expect(editTitleNumber).toHaveText('1.')
+    const editTitleNumberFont = await editTitleNumber.evaluate((el) => getComputedStyle(el).fontSize)
+    const editTitleFont = await page
+      .locator('.rich-title-quill--compact .ql-editor')
+      .first()
+      .evaluate((el) => getComputedStyle(el).fontSize)
+    expect(editTitleNumberFont).toBe(editTitleFont)
+    const editTitleNumberBox = await editTitleNumber.boundingBox()
+    const editTitleTextBox = await page.locator('.rich-title-quill--compact .ql-editor').first().boundingBox()
+    expect(editTitleNumberBox).not.toBeNull()
+    expect(editTitleTextBox).not.toBeNull()
+    if (editTitleNumberBox && editTitleTextBox) {
+      expect(Math.abs(editTitleNumberBox.y - editTitleTextBox.y)).toBeLessThan(6)
+    }
     await shoot('00-initial')
 
     // 1) 编辑选项文字
@@ -169,9 +184,21 @@ test.describe('问卷编辑页 选项行 UI', () => {
     // 9) 完成编辑后，必填红星与标题在同一行
     await page.getByRole('button', { name: '完成编辑' }).click()
     const titleText = page.locator('.edit-question-preview .sd-question__title .sv-string-viewer').first()
+    const titleNumber = page.locator('.edit-question-preview .sd-question__title .sd-element__num').first()
     const requiredStar = page.locator('.edit-question-preview .sd-question__required-text').first()
     await expect(titleText).toBeVisible()
+    await expect(titleNumber).toBeVisible()
     await expect(requiredStar).toBeVisible()
+    const previewTitleFont = await titleText.evaluate((el) => getComputedStyle(el).fontSize)
+    const previewNumberFont = await titleNumber.evaluate((el) => getComputedStyle(el).fontSize)
+    expect(previewNumberFont).toBe(previewTitleFont)
+    const previewTitleNumberBox = await titleNumber.boundingBox()
+    const previewTitleTextBox = await titleText.boundingBox()
+    expect(previewTitleNumberBox).not.toBeNull()
+    expect(previewTitleTextBox).not.toBeNull()
+    if (previewTitleNumberBox && previewTitleTextBox) {
+      expect(Math.abs(previewTitleNumberBox.y - previewTitleTextBox.y)).toBeLessThan(6)
+    }
     const titleBox = await titleText.boundingBox()
     const starBox = await requiredStar.boundingBox()
     expect(titleBox).not.toBeNull()
@@ -179,7 +206,7 @@ test.describe('问卷编辑页 选项行 UI', () => {
     if (titleBox && starBox) {
       const titleMidY = titleBox.y + titleBox.height / 2
       const starMidY = starBox.y + starBox.height / 2
-      expect(Math.abs(titleMidY - starMidY)).toBeLessThan(10)
+      expect(Math.abs(titleMidY - starMidY)).toBeLessThan(6)
     }
     await shoot('09-required-star-inline')
   })
