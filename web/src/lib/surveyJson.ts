@@ -60,7 +60,15 @@ export function buildTextValidators(config: Record<string, unknown>): { type: st
   return list
 }
 
-type OptItem = { label?: string; allowFill?: boolean; imageData?: string; imageUrl?: string; description?: string; descriptionOpenInPopup?: boolean }
+type OptItem = {
+  label?: string
+  allowFill?: boolean
+  hidden?: boolean
+  imageData?: string
+  imageUrl?: string
+  description?: string
+  descriptionOpenInPopup?: boolean
+}
 
 export function questionToElements(q: SurveyQuestionVO): Record<string, unknown>[] {
   const config = parseConfig(q.config)
@@ -72,6 +80,9 @@ export function questionToElements(q: SurveyQuestionVO): Record<string, unknown>
     ...(q.description != null && q.description !== '' ? { description: q.description } : {}),
   }
   const opts = (config.options as OptItem[] | undefined) ?? []
+  const visibleOpts = opts
+    .map((opt, index) => ({ opt, index }))
+    .filter(({ opt }) => opt?.hidden !== true)
   const hasOther = config.hasOtherOption === true
   const otherAllowFill = config.otherAllowFill === true
 
@@ -92,7 +103,7 @@ export function questionToElements(q: SurveyQuestionVO): Record<string, unknown>
 
   switch (q.type) {
     case 'SINGLE_CHOICE': {
-      let choices: { value: number | string; text: string; imageLink?: string; description?: string; descriptionOpenInPopup?: boolean }[] = opts.map((o: OptItem, i: number) => ({
+      let choices: { value: number | string; text: string; imageLink?: string; description?: string; descriptionOpenInPopup?: boolean }[] = visibleOpts.map(({ opt: o, index: i }) => ({
         value: i,
         text: o?.label ?? `选项${i + 1}`,
         ...((o?.imageData || o?.imageUrl) ? { imageLink: o.imageData || o.imageUrl } : {}),
@@ -100,7 +111,9 @@ export function questionToElements(q: SurveyQuestionVO): Record<string, unknown>
       }))
       if (hasOther) choices.push({ value: 'other', text: '其他' })
       if (optionsRandom) choices = shuffle(choices)
-      const allowFillIndices = opts.map((o: OptItem, i: number) => (o?.allowFill ? i : -1)).filter((i: number) => i >= 0)
+      const allowFillIndices = visibleOpts
+        .map(({ opt: o, index: i }) => (o?.allowFill ? i : -1))
+        .filter((i: number) => i >= 0)
       const visibleIfComment = allowFillIndices.length > 0
         ? allowFillIndices.map((i: number) => `{${name}} = ${i}`).join(' or ')
         : null
@@ -113,7 +126,7 @@ export function questionToElements(q: SurveyQuestionVO): Record<string, unknown>
           otherText: '其他',
           showCommentArea: hasOther && otherAllowFill,
           colCount: layout === 'horizontal' ? choices.length : 1,
-          ...(defaultOptionIndex != null && defaultOptionIndex >= 0 && defaultOptionIndex < opts.length ? { defaultValue: defaultOptionIndex } : {}),
+          ...(defaultOptionIndex != null && visibleOpts.some(({ index }) => index === defaultOptionIndex) ? { defaultValue: defaultOptionIndex } : {}),
           ...(optionsAsTags && { className: 'fill-options-as-tags' }),
         },
       ]
@@ -130,7 +143,7 @@ export function questionToElements(q: SurveyQuestionVO): Record<string, unknown>
       return elements
     }
     case 'MULTIPLE_CHOICE': {
-      let choices: { value: number | string; text: string; imageLink?: string; description?: string; descriptionOpenInPopup?: boolean }[] = opts.map((o: OptItem, i: number) => ({
+      let choices: { value: number | string; text: string; imageLink?: string; description?: string; descriptionOpenInPopup?: boolean }[] = visibleOpts.map(({ opt: o, index: i }) => ({
         value: i,
         text: o?.label ?? `选项${i + 1}`,
         ...((o?.imageData || o?.imageUrl) ? { imageLink: o.imageData || o.imageUrl } : {}),
@@ -138,7 +151,13 @@ export function questionToElements(q: SurveyQuestionVO): Record<string, unknown>
       }))
       if (hasOther) choices.push({ value: 'other', text: '其他' })
       if (optionsRandom) choices = shuffle(choices)
-      return [
+      const allowFillIndices = visibleOpts
+        .map(({ opt: o, index: i }) => (o?.allowFill ? i : -1))
+        .filter((i: number) => i >= 0)
+      const visibleIfComment = allowFillIndices.length > 0
+        ? allowFillIndices.map((i: number) => `{${name}} contains ${i}`).join(' or ')
+        : null
+      const elements: Record<string, unknown>[] = [
         {
           ...base,
           type: 'checkbox',
@@ -147,10 +166,25 @@ export function questionToElements(q: SurveyQuestionVO): Record<string, unknown>
           otherText: '其他',
           showCommentArea: hasOther && otherAllowFill,
           colCount: layout === 'horizontal' ? choices.length : 1,
-          ...(Array.isArray(defaultOptionIndices) && defaultOptionIndices.length > 0 ? { defaultValue: defaultOptionIndices } : {}),
+          ...(Array.isArray(defaultOptionIndices)
+            ? {
+                defaultValue: defaultOptionIndices.filter((index) => visibleOpts.some(({ index: visibleIndex }) => visibleIndex === index)),
+              }
+            : {}),
           ...(optionsAsTags && { className: 'fill-options-as-tags' }),
         },
       ]
+      if (visibleIfComment) {
+        elements.push({
+          type: 'comment',
+          name: `${name}-Comment`,
+          title: '',
+          visibleIf: visibleIfComment,
+          isRequired: false,
+          placeholder: '请填写',
+        })
+      }
+      return elements
     }
     case 'SHORT_TEXT': {
       const textValidators = buildTextValidators(config)

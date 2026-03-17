@@ -30,6 +30,10 @@ textarea:not(.surveyjs-root *):not(.sd-root-modern *),
 .edit-question-actions button {
   border-radius: 2px !important;
 }
+/* 选项行右侧图标按钮：始终保持正圆，不被全局圆角规则覆盖 */
+.option-row-action-btn {
+  border-radius: 9999px !important;
+}
 .table-modern th {
   background-color: #f3f4f6;
   font-weight: 600;
@@ -101,6 +105,24 @@ textarea:not(.surveyjs-root *):not(.sd-root-modern *),
 }
 .rich-title-quill--display .ql-editor:hover {
   background: rgba(0, 0, 0, 0.02);
+}
+
+/* 编辑问卷紧凑模式：压缩标题编辑器高度，减小与选项区的视觉间距 */
+.rich-title-quill--compact {
+  min-height: 5rem;
+}
+.rich-title-quill--compact .ql-container.ql-snow,
+.rich-title-quill--compact .ql-editor {
+  min-height: 3rem;
+}
+.rich-title-quill--compact .ql-editor {
+  padding: 4px 8px;
+  line-height: 1.5rem;
+}
+/* 紧凑模式也保留工具栏占位（仅隐藏），避免显示/编辑态切换时高度跳变 */
+.rich-title-quill--compact .ql-toolbar.ql-snow {
+  min-height: 32px;
+  padding: 2px 6px;
 }
 
 /* 与 ai-plugin 一致 */

@@ -9,7 +9,15 @@ import { Survey } from 'survey-react-ui'
 import { fillApi, surveysApi, type FillSurveyVO, type SurveyQuestionVO, type SubmitItemDTO, type ResponseDetailVO } from '@/services/api'
 import { parseConfig, metaToSurveyJson } from '@/lib/surveyJson'
 
-type OptItem = { label?: string; allowFill?: boolean; imageData?: string; imageUrl?: string; description?: string; descriptionOpenInPopup?: boolean }
+type OptItem = {
+  label?: string
+  allowFill?: boolean
+  hidden?: boolean
+  imageData?: string
+  imageUrl?: string
+  description?: string
+  descriptionOpenInPopup?: boolean
+}
 
 function surveyDataToItems(
   data: Record<string, unknown>,
@@ -38,9 +46,10 @@ function surveyDataToItems(
       const arr = Array.isArray(value) ? value : [value]
       const optionIndices = arr.filter((v): v is number => typeof v === 'number').sort((a, b) => a - b)
       const hasOtherSel = arr.includes('other')
+      const hasAllowFill = optionIndices.some((i) => (opts[i] as OptItem | undefined)?.allowFill === true)
       if (hasOtherSel) optionIndices.push(otherIndex)
       optionIndices.sort((a, b) => a - b)
-      const textValue = hasOtherSel ? ((data[`${name}-Comment`] as string) ?? '') : undefined
+      const textValue = hasOtherSel || hasAllowFill ? ((data[`${name}-Comment`] as string) ?? '') : undefined
       if (optionIndices.length) items.push({ questionId: q.id!, optionIndices, ...(textValue !== undefined && { textValue }) })
     } else if (q.type === 'SHORT_TEXT' || q.type === 'LONG_TEXT' || q.type === 'text' || q.type === 'comment') {
       const textValue = typeof value === 'string' ? value : String(value ?? '')
@@ -78,12 +87,15 @@ function applyDraftToModel(
         if (item.textValue != null) model.setValue(`${name}-Comment`, item.textValue)
       } else {
         model.setValue(name, item.optionIndex)
+        const opt = options[item.optionIndex]
+        if (opt?.allowFill === true && item.textValue != null) model.setValue(`${name}-Comment`, item.textValue)
       }
     } else if (q.type === 'MULTIPLE_CHOICE') {
       if (!item.optionIndices?.length) continue
       const value = item.optionIndices.map((i) => (i === otherIndex ? 'other' : i))
       model.setValue(name, value)
-      if (item.textValue != null) model.setValue(`${name}-Comment`, item.textValue)
+      const hasAllowFill = item.optionIndices.some((i) => i !== otherIndex && options[i]?.allowFill === true)
+      if ((item.textValue != null) && (value.includes('other') || hasAllowFill)) model.setValue(`${name}-Comment`, item.textValue)
     } else if (q.type === 'SHORT_TEXT' || q.type === 'LONG_TEXT' || q.type === 'text' || q.type === 'comment') {
       if (item.textValue != null) model.setValue(name, item.textValue)
     } else if (q.type === 'SCALE' || q.type === 'rating') {
