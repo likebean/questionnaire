@@ -407,7 +407,7 @@ function SortableOptionRow({
   const mainRow = (
     <div
       className={[
-        'flex items-center gap-1.5 py-0',
+        'flex items-center gap-1.5 py-0 transition-colors hover:bg-gray-100/80 focus-within:bg-gray-100/80',
         opt.hidden === true ? 'opacity-70' : '',
       ].join(' ')}
     >
