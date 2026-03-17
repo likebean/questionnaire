@@ -8,6 +8,7 @@ import { FlatLight } from 'survey-core/themes'
 import { Survey } from 'survey-react-ui'
 import { fillApi, surveysApi, type FillSurveyVO, type SurveyQuestionVO, type SubmitItemDTO, type ResponseDetailVO } from '@/services/api'
 import { parseConfig, metaToSurveyJson } from '@/lib/surveyJson'
+import { applySurveyRichTextRenderer } from '@/lib/richText'
 
 type OptItem = {
   label?: string
@@ -172,6 +173,7 @@ export default function FillPage() {
     if (!meta) return null
     const json = metaToSurveyJson(meta)
     const model = new Model(json)
+    applySurveyRichTextRenderer(model)
     model.applyTheme(FlatLight)
     model.showNavigationButtons = false
     model.showCompletedPage = false

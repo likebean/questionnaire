@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
+import { sanitizeRichTextHtml } from '@/lib/richText'
 
 const ReactQuill = dynamic(() => import('react-quill'), { ssr: false })
 import 'react-quill/dist/quill.snow.css'
@@ -37,11 +38,12 @@ export function RichTitleEditor({
   const ignoreNextClickRef = useRef(false)
 
   useEffect(() => {
-    setEditValue(value)
+    setEditValue(sanitizeRichTextHtml(value))
   }, [value])
 
   const saveAndExit = useCallback(() => {
-    onChange(lastHtmlRef.current)
+    const sanitized = sanitizeRichTextHtml(lastHtmlRef.current)
+    onChange(sanitized)
     setIsEditing(false)
   }, [onChange])
 
@@ -76,7 +78,7 @@ export function RichTitleEditor({
   }, [isEditing, saveAndExit])
 
   const handleFocus = useCallback(() => {
-    lastHtmlRef.current = value
+    lastHtmlRef.current = sanitizeRichTextHtml(value)
     setIsEditing(true)
   }, [value])
 
@@ -112,7 +114,7 @@ export function RichTitleEditor({
         value={editValue}
         onChange={(val, delta, source, editor) => {
           setEditValue(val)
-          if (editor) lastHtmlRef.current = editor.getHTML()
+          if (editor) lastHtmlRef.current = sanitizeRichTextHtml(editor.getHTML())
         }}
         onFocus={handleFocus}
         readOnly={!isEditing}

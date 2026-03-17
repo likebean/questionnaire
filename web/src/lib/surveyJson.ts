@@ -1,4 +1,5 @@
 import type { FillSurveyVO, SurveyQuestionVO } from '@/services/api'
+import { normalizeOptionLabelHtml, sanitizeRichTextHtml } from '@/lib/richText'
 
 export function parseConfig(c: string | null | undefined): Record<string, unknown> {
   if (!c) return {}
@@ -75,7 +76,7 @@ export function questionToElements(q: SurveyQuestionVO): Record<string, unknown>
   const name = String(q.id!)
   const base: Record<string, unknown> = {
     name,
-    title: q.title || '题目',
+    title: sanitizeRichTextHtml(q.title || '题目') || '题目',
     isRequired: q.required !== false,
     ...(q.description != null && q.description !== '' ? { description: q.description } : {}),
   }
@@ -105,7 +106,7 @@ export function questionToElements(q: SurveyQuestionVO): Record<string, unknown>
     case 'SINGLE_CHOICE': {
       let choices: { value: number | string; text: string; imageLink?: string; description?: string; descriptionOpenInPopup?: boolean }[] = visibleOpts.map(({ opt: o, index: i }) => ({
         value: i,
-        text: o?.label ?? `选项${i + 1}`,
+        text: normalizeOptionLabelHtml(o?.label, `选项${i + 1}`),
         ...((o?.imageData || o?.imageUrl) ? { imageLink: o.imageData || o.imageUrl } : {}),
         ...(o?.description ? { description: o.description, descriptionOpenInPopup: o.descriptionOpenInPopup === true } : {}),
       }))
@@ -145,7 +146,7 @@ export function questionToElements(q: SurveyQuestionVO): Record<string, unknown>
     case 'MULTIPLE_CHOICE': {
       let choices: { value: number | string; text: string; imageLink?: string; description?: string; descriptionOpenInPopup?: boolean }[] = visibleOpts.map(({ opt: o, index: i }) => ({
         value: i,
-        text: o?.label ?? `选项${i + 1}`,
+        text: normalizeOptionLabelHtml(o?.label, `选项${i + 1}`),
         ...((o?.imageData || o?.imageUrl) ? { imageLink: o.imageData || o.imageUrl } : {}),
         ...(o?.description ? { description: o.description, descriptionOpenInPopup: o.descriptionOpenInPopup === true } : {}),
       }))

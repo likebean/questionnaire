@@ -41,6 +41,12 @@ import {
   Trash2,
 } from 'lucide-react'
 import { singleQuestionToSurveyJson } from '@/lib/surveyJson'
+import {
+  applySurveyRichTextRenderer,
+  normalizeOptionLabelHtml,
+  richTextToPlainText,
+  toInlineRichTextHtml,
+} from '@/lib/richText'
 import { RichTitleEditor } from '@/app/_components/RichTitleEditor'
 import 'survey-core/survey-core.min.css'
 import '@/app/fill/fill.css'
@@ -104,7 +110,7 @@ function getOptions(config: Record<string, unknown>): OptionItem[] {
   if (!Array.isArray(o)) return [{ sortOrder: 0, label: '选项1' }]
   return o.map((x: Record<string, unknown>, i: number) => ({
     sortOrder: (x.sortOrder as number) ?? i,
-    label: (x.label as string) ?? `选项${i + 1}`,
+    label: normalizeOptionLabelHtml((x.label as string) ?? '', `选项${i + 1}`),
     description: x.description as string | undefined,
     descriptionOpenInPopup: x.descriptionOpenInPopup === true,
     allowFill: x.allowFill === true,
@@ -112,16 +118,6 @@ function getOptions(config: Record<string, unknown>): OptionItem[] {
     imageUrl: x.imageUrl as string | undefined,
     imageData: x.imageData as string | undefined,
   }))
-}
-
-function stripHtml(html: string | null | undefined): string {
-  if (!html) return ''
-  return html.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim()
-}
-
-function getOptionPlainLabel(opt: OptionItem, index: number): string {
-  const text = stripHtml(opt.label)
-  return text || `选项${index + 1}`
 }
 
 function getInt(config: Record<string, unknown>, key: string, def: number): number {
@@ -135,6 +131,7 @@ function QuestionFillPreview({ question, index }: { question: SurveyQuestionVO; 
   const surveyModel = useMemo(() => {
     const json = singleQuestionToSurveyJson(question)
     const model = new Model(json)
+    applySurveyRichTextRenderer(model)
     model.applyTheme(FlatLight)
     model.showNavigationButtons = false
     model.showCompletedPage = false
@@ -395,6 +392,7 @@ function SortableOptionRow({
     ? 'sd-visuallyhidden sd-item__control sd-checkbox__control'
     : 'sd-visuallyhidden sd-item__control sd-radio__control'
   const controlId = `edit-opt-${questionType}-${index}`
+  const optionLabelHtml = toInlineRichTextHtml(opt.label, `选项${index + 1}`)
   const actionButtonClass = (active = false, danger = false) =>
     [
       'option-row-action-btn inline-flex h-9 w-9 items-center justify-center rounded-full border bg-white text-[12px] transition-colors',
@@ -437,7 +435,10 @@ function SortableOptionRow({
               />
               <span className={`sd-item__decorator ${decoratorClassName}`} />
               <span className={`sd-item__control-label ${opt.hidden === true ? 'line-through' : ''}`}>
-                <span className="sv-string-viewer">{getOptionPlainLabel(opt, index)}</span>
+                <span
+                  className="sv-string-viewer inline-block align-middle [&_p]:m-0 [&_p]:inline [&_div]:m-0 [&_div]:inline [&_span.ql-cursor]:hidden"
+                  dangerouslySetInnerHTML={{ __html: optionLabelHtml }}
+                />
               </span>
             </label>
           </div>
@@ -1122,7 +1123,9 @@ function QuestionEditor({
   const saveOptionDialog = () => {
     if (!optionDialog) return
     if (optionDialog.mode === 'label') {
-      patchOptionAt(optionDialog.index, { label: labelDraft || `选项${optionDialog.index + 1}` })
+      patchOptionAt(optionDialog.index, {
+        label: normalizeOptionLabelHtml(labelDraft, `选项${optionDialog.index + 1}`),
+      })
     } else if (optionDialog.mode === 'description') {
       patchOptionAt(optionDialog.index, {
         description: descriptionDraft.trim() || undefined,
@@ -1313,7 +1316,7 @@ function QuestionEditor({
                       type="button"
                       onClick={() => {
                         const lines = (g.items ?? [])
-                          .map((it) => stripHtml(it.label ?? '').trim())
+                          .map((it) => richTextToPlainText(it.label ?? '').trim())
                           .filter((s) => s.length > 0)
                           .join('\n')
                         if (!lines) return
