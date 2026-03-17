@@ -112,13 +112,7 @@ export function questionToElements(q: SurveyQuestionVO): Record<string, unknown>
       }))
       if (hasOther) choices.push({ value: 'other', text: '其他' })
       if (optionsRandom) choices = shuffle(choices)
-      const allowFillIndices = visibleOpts
-        .map(({ opt: o, index: i }) => (o?.allowFill ? i : -1))
-        .filter((i: number) => i >= 0)
-      const visibleIfComment = allowFillIndices.length > 0
-        ? allowFillIndices.map((i: number) => `{${name}} = ${i}`).join(' or ')
-        : null
-      const elements: Record<string, unknown>[] = [
+      return [
         {
           ...base,
           type: 'radiogroup',
@@ -131,17 +125,6 @@ export function questionToElements(q: SurveyQuestionVO): Record<string, unknown>
           ...(optionsAsTags && { className: 'fill-options-as-tags' }),
         },
       ]
-      if (visibleIfComment) {
-        elements.push({
-          type: 'comment',
-          name: `${name}-Comment`,
-          title: '',
-          visibleIf: visibleIfComment,
-          isRequired: false,
-          placeholder: '请填写',
-        })
-      }
-      return elements
     }
     case 'MULTIPLE_CHOICE': {
       let choices: { value: number | string; text: string; imageLink?: string; description?: string; descriptionOpenInPopup?: boolean }[] = visibleOpts.map(({ opt: o, index: i }) => ({
@@ -152,13 +135,7 @@ export function questionToElements(q: SurveyQuestionVO): Record<string, unknown>
       }))
       if (hasOther) choices.push({ value: 'other', text: '其他' })
       if (optionsRandom) choices = shuffle(choices)
-      const allowFillIndices = visibleOpts
-        .map(({ opt: o, index: i }) => (o?.allowFill ? i : -1))
-        .filter((i: number) => i >= 0)
-      const visibleIfComment = allowFillIndices.length > 0
-        ? allowFillIndices.map((i: number) => `{${name}} contains ${i}`).join(' or ')
-        : null
-      const elements: Record<string, unknown>[] = [
+      return [
         {
           ...base,
           type: 'checkbox',
@@ -175,17 +152,6 @@ export function questionToElements(q: SurveyQuestionVO): Record<string, unknown>
           ...(optionsAsTags && { className: 'fill-options-as-tags' }),
         },
       ]
-      if (visibleIfComment) {
-        elements.push({
-          type: 'comment',
-          name: `${name}-Comment`,
-          title: '',
-          visibleIf: visibleIfComment,
-          isRequired: false,
-          placeholder: '请填写',
-        })
-      }
-      return elements
     }
     case 'SHORT_TEXT': {
       const textValidators = buildTextValidators(config)

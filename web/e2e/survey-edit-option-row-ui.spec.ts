@@ -11,6 +11,9 @@ test.describe('问卷编辑页 选项行 UI', () => {
         fullPage: true,
       })
     }
+    page.on('dialog', async (dialog) => {
+      await dialog.accept()
+    })
 
     await page.route('**/api/auth/me*', async (route) => {
       await route.fulfill({
@@ -176,5 +179,122 @@ test.describe('问卷编辑页 选项行 UI', () => {
       expect(Math.abs(titleMidY - starMidY)).toBeLessThan(10)
     }
     await shoot('09-required-star-inline')
+  })
+
+  test('允许填空在选项下方显示单行输入，不显示 comment 标题', async ({ page }) => {
+    const surveyId = 'mock-allow-fill-inline'
+
+    await page.route('**/api/auth/me*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 200,
+          message: 'ok',
+          data: {
+            id: 'u-admin',
+            nickname: '管理员',
+            email: null,
+            phone: null,
+            identityType: 'LOCAL',
+            departmentId: null,
+            roleCodes: ['ADMIN'],
+          },
+        }),
+      })
+    })
+
+    await page.route(`**/api/surveys/${surveyId}*`, async (route) => {
+      const req = route.request()
+      const url = new URL(req.url())
+      const isSurveyDetailGet =
+        req.method() === 'GET'
+        && url.pathname.startsWith(`/api/surveys/${surveyId}`)
+        && !url.pathname.includes('/questions/')
+      if (isSurveyDetailGet) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            code: 200,
+            message: 'ok',
+            data: {
+              id: surveyId,
+              title: '允许填空UI测试',
+              description: '',
+              status: 'DRAFT',
+              questions: [
+                {
+                  id: 201,
+                  surveyId,
+                  sortOrder: 0,
+                  type: 'SINGLE_CHOICE',
+                  title: '请选择一个选项',
+                  required: true,
+                  config: JSON.stringify({
+                    layout: 'vertical',
+                    optionsRandom: false,
+                    options: [
+                      { sortOrder: 0, label: '选项A' },
+                      { sortOrder: 1, label: '选项B' },
+                    ],
+                  }),
+                },
+              ],
+            },
+          }),
+        })
+        return
+      }
+      await route.fallback()
+    })
+
+    await page.route(`**/api/surveys/${surveyId}/questions/201*`, async (route) => {
+      if (route.request().method() === 'PUT') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ code: 200, message: 'ok', data: null }),
+        })
+        return
+      }
+      await route.fallback()
+    })
+
+    await page.goto(`/surveys/${surveyId}/edit`, { waitUntil: 'networkidle' })
+    await expect(page.getByRole('heading', { name: '编辑问卷' })).toBeVisible({ timeout: 15000 })
+
+    // 先开启“允许填空”
+    await page.locator('.option-row-action-btn[title="允许填空"]').nth(0).click()
+    await expect(page.locator('.option-row-action-btn[title="允许填空"]').nth(0)).toHaveClass(/bg-blue-50/)
+
+    // 切到预览态验证显示行为
+    await page.getByRole('button', { name: '完成编辑' }).click()
+    const preview = page.locator('.edit-question-preview').first()
+    await expect(preview).toBeVisible()
+    await expect(preview.locator('input.fill-choice-inline-input')).toHaveCount(0)
+
+    await preview.locator('.sd-item').filter({ hasText: '选项A' }).first().locator('.sd-item__control-label').click()
+    const inlineInput = preview.locator('input.fill-choice-inline-input').first()
+    await expect(inlineInput).toBeVisible()
+    expect(await inlineInput.evaluate((el) => el.tagName)).toBe('INPUT')
+    await expect(preview.locator('textarea[placeholder="请填写"]')).toHaveCount(0)
+    await expect(preview.locator('input[placeholder="请填写"]:visible')).toHaveCount(1)
+    const selectedItem = preview.locator('.sd-item').filter({ hasText: '选项A' }).first()
+    const optionText = selectedItem.locator('.sd-item__control-label .sv-string-viewer, .sd-item__control-label').first()
+    const optionTextBox = await optionText.boundingBox()
+    const inputBox = await inlineInput.boundingBox()
+    expect(optionTextBox).not.toBeNull()
+    expect(inputBox).not.toBeNull()
+    if (optionTextBox && inputBox) {
+      expect(inputBox.y).toBeGreaterThan(optionTextBox.y + optionTextBox.height - 2)
+      expect(Math.abs(inputBox.x - optionTextBox.x)).toBeLessThan(12)
+    }
+    await expect(preview).not.toContainText(/500-comment|201-comment/i)
+
+    await page.screenshot({
+      path: 'test-results/option-actions-10-allow-fill-inline-input.png',
+      fullPage: true,
+    })
   })
 })

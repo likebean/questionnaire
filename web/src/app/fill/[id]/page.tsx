@@ -9,6 +9,7 @@ import { Survey } from 'survey-react-ui'
 import { fillApi, surveysApi, type FillSurveyVO, type SurveyQuestionVO, type SubmitItemDTO, type ResponseDetailVO } from '@/services/api'
 import { parseConfig, metaToSurveyJson } from '@/lib/surveyJson'
 import { applySurveyRichTextRenderer } from '@/lib/richText'
+import { enhanceChoiceQuestionDom } from '@/lib/choiceQuestionEnhance'
 
 type OptItem = {
   label?: string
@@ -191,6 +192,10 @@ export default function FillPage() {
     })
     model.onAfterRenderQuestion.add((_sender, options) => {
       const question = options.question
+      if (typeof question.name === 'string' && question.name.endsWith('-Comment')) {
+        options.htmlElement?.classList.add('fill-option-inline-hidden')
+        return
+      }
       if (question.getType() !== 'radiogroup' && question.getType() !== 'checkbox') return
       const qMeta = meta?.questions?.find((q) => String(q.id) === question.name)
       if (!qMeta) return
@@ -198,32 +203,12 @@ export default function FillPage() {
       const opts = (config.options as OptItem[]) ?? []
       const root = options.htmlElement
       if (!root) return
-      const items = root.querySelectorAll('.sd-item')
-      items.forEach((el) => {
-        const input = el.querySelector('input')
-        const value = input?.getAttribute('value')
-        if (value == null) return
-        const num = value === 'other' ? -1 : parseInt(value, 10)
-        if (Number.isNaN(num) || num < 0) return
-        const o = opts[num]
-        if (!o?.description?.trim()) return
-        const openInPopup = o.descriptionOpenInPopup === true
-        const link = document.createElement('a')
-        link.href = o.description.trim()
-        link.textContent = ' 说明'
-        link.className = 'fill-choice-description-link text-blue-600 text-sm ml-1'
-        link.rel = 'noopener noreferrer'
-        if (openInPopup) {
-          link.target = '_blank'
-          link.onclick = (e) => {
-            e.preventDefault()
-            window.open(link.href, '_blank', 'width=600,height=400,scrollbars=yes')
-          }
-        } else {
-          link.target = '_blank'
-        }
-        const label = el.querySelector('label')
-        if (label) label.appendChild(link)
+      enhanceChoiceQuestionDom({
+        questionName: question.name,
+        root,
+        config: { ...config, options: opts },
+        getValue: (name) => model.getValue(name),
+        setValue: (name, value) => model.setValue(name, value),
       })
     })
     return model

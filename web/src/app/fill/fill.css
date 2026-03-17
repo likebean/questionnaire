@@ -52,6 +52,36 @@
   background: rgba(25, 179, 148, 0.08);
 }
 
+/* 允许填空：跟随选项显示单行输入，贴近选项区域 */
+.fill-page-card .fill-option-inline-input {
+  display: none !important;
+}
+.fill-page-card .fill-option-inline-hidden {
+  display: none !important;
+}
+.fill-page-card .fill-choice-inline-host {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.fill-page-card .fill-choice-inline-host > .sd-selectbase__label {
+  width: 100%;
+}
+.fill-page-card .fill-choice-inline-input-wrap {
+  margin-top: calc(0.75 * (var(--sjs-base-unit, 8px)));
+  margin-left: 0;
+  width: min(360px, 100%);
+  flex: 0 0 100%;
+  order: 3;
+}
+.fill-page-card .fill-choice-inline-input {
+  width: 100%;
+  min-height: auto;
+  height: 36px;
+}
+.fill-page-card .fill-options-as-tags .fill-choice-inline-input-wrap {
+  margin-left: 0;
+}
+
 /* 2. 题目块不单独成卡：去掉阴影、与卡片同背景，题目之间无分割线 */
 .fill-page-card .sd-element--with-frame {
   box-shadow: none;

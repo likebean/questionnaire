@@ -47,6 +47,7 @@ import {
   richTextToPlainText,
   toInlineRichTextHtml,
 } from '@/lib/richText'
+import { enhanceChoiceQuestionDom } from '@/lib/choiceQuestionEnhance'
 import { RichTitleEditor } from '@/app/_components/RichTitleEditor'
 import 'survey-core/survey-core.min.css'
 import '@/app/fill/fill.css'
@@ -132,6 +133,23 @@ function QuestionFillPreview({ question, index }: { question: SurveyQuestionVO; 
     const json = singleQuestionToSurveyJson(question)
     const model = new Model(json)
     applySurveyRichTextRenderer(model)
+    model.onAfterRenderQuestion.add((_sender, options) => {
+      const q = options.question
+      if (typeof q.name === 'string' && q.name.endsWith('-Comment')) {
+        options.htmlElement?.classList.add('fill-option-inline-hidden')
+        return
+      }
+      if (q.getType() !== 'radiogroup' && q.getType() !== 'checkbox') return
+      const root = options.htmlElement
+      if (!root) return
+      enhanceChoiceQuestionDom({
+        questionName: q.name,
+        root,
+        config: parseConfig(question.config),
+        getValue: (name) => model.getValue(name),
+        setValue: (name, value) => model.setValue(name, value),
+      })
+    })
     model.applyTheme(FlatLight)
     model.showNavigationButtons = false
     model.showCompletedPage = false
@@ -229,9 +247,9 @@ function SortableQuestionCard({
             hideActions
             compact
           />
-          <div className="mt-4 pt-3 pb-3 border-t border-gray-200/50 bg-gray-100/30 -mx-4 px-4 flex flex-wrap items-center justify-between gap-3 rounded-b">
-            <div className="flex flex-wrap items-center gap-4">
-              <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
+          <div className="mt-4 pt-3 pb-3 border-t border-gray-200/50 bg-gray-100/30 -mx-4 px-4 flex flex-wrap items-center justify-end gap-2 rounded-b">
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer whitespace-nowrap">
                 <input
                   type="checkbox"
                   checked={question.required !== false}
@@ -240,9 +258,6 @@ function SortableQuestionCard({
                 />
                 必填
               </label>
-              <span className="text-sm text-gray-500">{typeLabel}</span>
-            </div>
-            <div className="ml-auto flex flex-wrap items-center gap-2">
               {isChoiceQuestion && (
                 <>
                   <select
@@ -459,7 +474,7 @@ function SortableOptionRow({
         <button type="button" onClick={onInsertAfter} className={actionButtonClass()} title="在下方插入选项">
           <Plus className={iconClassName} />
         </button>
-        <button type="button" onClick={onRemove} className={actionButtonClass(false, true)} title="删除选项">
+        <button type="button" onClick={onRemove} className={actionButtonClass()} title="删除选项">
           <Trash2 className={iconClassName} />
         </button>
         <button
