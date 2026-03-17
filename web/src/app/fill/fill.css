@@ -12,6 +12,24 @@
   white-space: pre-line;
 }
 
+/* 标题富文本保持行内，必填红星与标题同一行 */
+.fill-page-card .sd-question__title .sv-string-viewer,
+.fill-page-card .sd-title.sd-container-modern__title .sv-string-viewer {
+  display: inline;
+}
+.fill-page-card .sd-question__title .sv-string-viewer > p,
+.fill-page-card .sd-question__title .sv-string-viewer > div,
+.fill-page-card .sd-title.sd-container-modern__title .sv-string-viewer > p,
+.fill-page-card .sd-title.sd-container-modern__title .sv-string-viewer > div {
+  display: inline;
+  margin: 0;
+}
+.fill-page-card .sd-question__required-text {
+  display: inline;
+  vertical-align: baseline;
+  margin-left: 2px;
+}
+
 /* 选项标签化呈现 */
 .fill-page-card .fill-options-as-tags .sd-item {
   display: inline-block;
