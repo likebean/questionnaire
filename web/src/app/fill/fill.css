@@ -193,6 +193,45 @@
   border-color: #b8bdc7;
   color: #6f7580;
 }
+.fill-choice-image-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.62);
+  padding: 24px;
+}
+.fill-choice-image-preview-overlay.is-open {
+  display: flex;
+}
+.fill-choice-image-preview-image {
+  max-width: min(92vw, 1100px);
+  max-height: 90vh;
+  object-fit: contain;
+  background: #fff;
+  border-radius: 8px;
+}
+.fill-choice-image-preview-close {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  font-size: 24px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.fill-choice-image-preview-close:hover {
+  background: rgba(0, 0, 0, 0.35);
+}
 
 /* 允许填空：跟随选项显示单行输入，贴近选项区域 */
 .fill-page-card .fill-option-inline-input {
