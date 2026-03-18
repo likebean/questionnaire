@@ -10,10 +10,12 @@ import { fillApi, surveysApi, type FillSurveyVO, type SurveyQuestionVO, type Sub
 import { parseConfig, metaToSurveyJson } from '@/lib/surveyJson'
 import { applySurveyRichTextRenderer } from '@/lib/richText'
 import { enhanceChoiceQuestionDom } from '@/lib/choiceQuestionEnhance'
+import { normalizeExclusiveChoiceValue } from '@/lib/choiceExclusive'
 
 type OptItem = {
   label?: string
   allowFill?: boolean
+  exclusive?: boolean
   hidden?: boolean
   imageData?: string
   imageUrl?: string
@@ -178,6 +180,20 @@ export default function FillPage() {
     model.applyTheme(FlatLight)
     model.showNavigationButtons = false
     model.showCompletedPage = false
+    model.onValueChanging.add((_sender, options) => {
+      const qMeta = meta?.questions?.find((q) => String(q.id) === options.name)
+      if (!qMeta || qMeta.type !== 'MULTIPLE_CHOICE') return
+      const config = parseConfig(qMeta.config)
+      const choiceOptions = ((config.options as OptItem[] | undefined) ?? [])
+      const normalized = normalizeExclusiveChoiceValue({
+        oldValue: options.oldValue,
+        nextValue: options.value,
+        choiceOptions,
+      })
+      if (normalized !== options.value) {
+        options.value = normalized
+      }
+    })
     let saveDraftTimer: ReturnType<typeof setTimeout> | null = null
     model.onValueChanged.add((sender) => {
       if (previewMode || viewMode) return

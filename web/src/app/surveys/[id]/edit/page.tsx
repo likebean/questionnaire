@@ -49,6 +49,7 @@ import {
   toInlineRichTextHtml,
 } from '@/lib/richText'
 import { enhanceChoiceQuestionDom } from '@/lib/choiceQuestionEnhance'
+import { normalizeExclusiveChoiceValue } from '@/lib/choiceExclusive'
 import { RichTitleEditor } from '@/app/_components/RichTitleEditor'
 import 'survey-core/survey-core.min.css'
 import '@/app/fill/fill.css'
@@ -103,6 +104,7 @@ type OptionItem = {
   descriptionDisplayMode?: 'inline' | 'popup'
   descriptionLinkOpenMode?: 'popup' | 'newTab'
   allowFill?: boolean
+  exclusive?: boolean
   hidden?: boolean
   /** 图片外链 URL */
   imageUrl?: string
@@ -168,10 +170,16 @@ function getOptions(config: Record<string, unknown>): OptionItem[] {
     descriptionDisplayMode: x.descriptionDisplayMode === 'popup' ? 'popup' : (x.descriptionDisplayMode === 'inline' ? 'inline' : undefined),
     descriptionLinkOpenMode: x.descriptionLinkOpenMode === 'popup' ? 'popup' : (x.descriptionLinkOpenMode === 'newTab' ? 'newTab' : undefined),
     allowFill: x.allowFill === true,
+    exclusive: x.exclusive === true,
     hidden: x.hidden === true,
     imageUrl: x.imageUrl as string | undefined,
     imageData: x.imageData as string | undefined,
   }))
+}
+
+function getVisibleChoiceOptionCount(config: Record<string, unknown>): number {
+  const visibleCount = getOptions(config).filter((opt) => opt.hidden !== true).length
+  return Math.max(1, visibleCount)
 }
 
 function getInt(config: Record<string, unknown>, key: string, def: number): number {
@@ -211,6 +219,18 @@ function QuestionFillPreview({ question, index }: { question: SurveyQuestionVO; 
     const json = singleQuestionToSurveyJson(question)
     const model = new Model(json)
     applySurveyRichTextRenderer(model)
+    model.onValueChanging.add((_sender, options) => {
+      if (question.type !== 'MULTIPLE_CHOICE') return
+      if (options.name !== String(question.id)) return
+      const config = parseConfig(question.config)
+      const choiceOptions = ((config.options as OptionItem[] | undefined) ?? [])
+      const normalized = normalizeExclusiveChoiceValue({
+        oldValue: options.oldValue,
+        nextValue: options.value,
+        choiceOptions,
+      })
+      if (normalized !== options.value) options.value = normalized
+    })
     model.onAfterRenderQuestion.add((_sender, options) => {
       const q = options.question
       const numberEl = options.htmlElement?.querySelector('.sd-element__num') as HTMLElement | null
@@ -285,6 +305,18 @@ function SortableQuestionCard({
 
   const config = parseConfig(question.config)
   const isChoiceQuestion = question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE'
+  const isMultipleChoice = question.type === 'MULTIPLE_CHOICE'
+  const choiceOptionCount = isMultipleChoice ? getVisibleChoiceOptionCount(config) : 1
+  const minChoicesFloor = question.required !== false ? 1 : 0
+  const rawMinChoices = typeof config.minChoices === 'number' ? config.minChoices : Number(config.minChoices)
+  const compactMinChoices = isMultipleChoice
+    ? Math.min(choiceOptionCount, Math.max(minChoicesFloor, Number.isFinite(rawMinChoices) ? Math.trunc(rawMinChoices) : minChoicesFloor))
+    : 0
+  const rawMaxChoices = typeof config.maxChoices === 'number' ? config.maxChoices : Number(config.maxChoices)
+  const compactMaxChoicesBase = isMultipleChoice
+    ? Math.min(choiceOptionCount, Math.max(1, Number.isFinite(rawMaxChoices) ? Math.trunc(rawMaxChoices) : choiceOptionCount))
+    : 1
+  const compactMaxChoices = isMultipleChoice ? Math.max(compactMinChoices, compactMaxChoicesBase) : 1
   const canMoveUp = index > 0
   const canMoveDown = index < totalCount - 1
 
@@ -335,11 +367,82 @@ function SortableQuestionCard({
                 <input
                   type="checkbox"
                   checked={question.required !== false}
-                  onChange={(e) => onUpdate({ required: e.target.checked })}
+                  onChange={(e) => {
+                    const nextRequired = e.target.checked
+                    if (!isMultipleChoice) {
+                      onUpdate({ required: nextRequired })
+                      return
+                    }
+                    const nextMinFloor = nextRequired ? 1 : 0
+                    const nextMinChoices = Math.min(choiceOptionCount, Math.max(nextMinFloor, compactMinChoices))
+                    const nextMaxChoices = Math.max(nextMinChoices, compactMaxChoices)
+                    onUpdate({
+                      required: nextRequired,
+                      config: JSON.stringify({
+                        ...config,
+                        minChoices: nextMinChoices,
+                        maxChoices: nextMaxChoices,
+                      }),
+                    })
+                  }}
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
                 必填
               </label>
+              {isMultipleChoice && (
+                <>
+                  <label className="inline-flex items-center gap-1.5 text-sm text-gray-600 whitespace-nowrap">
+                    至少选
+                    <select
+                      value={String(compactMinChoices)}
+                      onChange={(e) => {
+                        const nextMinChoices = Math.min(choiceOptionCount, Math.max(minChoicesFloor, Number(e.target.value)))
+                        setChoiceConfig({
+                          minChoices: nextMinChoices,
+                          maxChoices: Math.max(nextMinChoices, compactMaxChoices),
+                        })
+                      }}
+                      className="inline-block w-16 shrink-0 rounded border border-gray-300 bg-white px-2 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      title="至少选"
+                    >
+                      {Array.from({ length: choiceOptionCount - minChoicesFloor + 1 }, (_, idx) => {
+                        const n = minChoicesFloor + idx
+                        return (
+                          <option key={`compact-min-${n}`} value={String(n)}>
+                            {n}
+                          </option>
+                        )
+                      })}
+                    </select>
+                    项
+                  </label>
+                  <label className="inline-flex items-center gap-1.5 text-sm text-gray-600 whitespace-nowrap">
+                    至多选
+                    <select
+                      value={String(compactMaxChoices)}
+                      onChange={(e) => {
+                        const nextMaxChoices = Math.min(choiceOptionCount, Math.max(1, Number(e.target.value)))
+                        setChoiceConfig({
+                          minChoices: Math.min(compactMinChoices, nextMaxChoices),
+                          maxChoices: nextMaxChoices,
+                        })
+                      }}
+                      className="inline-block w-16 shrink-0 rounded border border-gray-300 bg-white px-2 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      title="至多选"
+                    >
+                      {Array.from({ length: choiceOptionCount }, (_, idx) => {
+                        const n = idx + 1
+                        return (
+                          <option key={`compact-max-${n}`} value={String(n)}>
+                            {n}
+                          </option>
+                        )
+                      })}
+                    </select>
+                    项
+                  </label>
+                </>
+              )}
               {isChoiceQuestion && (
                 <>
                   <select
@@ -459,6 +562,8 @@ function SortableOptionRow({
   onOpenImageEditor,
   onTogglePreviewSelected,
   previewSelected,
+  onToggleExclusive,
+  isExclusive,
   onToggleDefault,
   isDefault,
   previewFillValue,
@@ -476,6 +581,8 @@ function SortableOptionRow({
   onOpenImageEditor: () => void
   onTogglePreviewSelected: () => void
   previewSelected: boolean
+  onToggleExclusive: () => void
+  isExclusive: boolean
   onToggleDefault: () => void
   isDefault: boolean
   previewFillValue: string
@@ -489,6 +596,9 @@ function SortableOptionRow({
   const itemClassName = isMultipleChoice
     ? 'sd-item sd-checkbox sd-selectbase__item sv-q-col-1'
     : 'sd-item sd-radio sd-selectbase__item sv-q-col-1'
+  const itemAllowHoverClassName = isMultipleChoice
+    ? 'sd-item--allowhover sd-checkbox--allowhover'
+    : 'sd-item--allowhover sd-radio--allowhover'
   const itemCheckedClassName = isMultipleChoice
     ? 'sd-item--checked sd-checkbox--checked'
     : 'sd-item--checked sd-radio--checked'
@@ -560,7 +670,7 @@ function SortableOptionRow({
       </button>
       <div className="flex-1 min-w-0">
         <div className="sd-selectbase">
-          <div className={[itemClassName, previewSelected ? itemCheckedClassName : ''].join(' ')}>
+          <div className={[itemClassName, previewSelected ? itemCheckedClassName : itemAllowHoverClassName].join(' ')}>
             <label
               className="sd-selectbase__label"
             >
@@ -571,7 +681,13 @@ function SortableOptionRow({
                 className={inputControlClassName}
                 onChange={onTogglePreviewSelected}
               />
-              <span className={`sd-item__decorator ${decoratorClassName}`} />
+              <span className={`sd-item__decorator ${decoratorClassName}`}>
+                {isMultipleChoice && (
+                  <svg className="sd-item__svg sd-checkbox__svg">
+                    <use xlinkHref="#icon-check-16x16" />
+                  </svg>
+                )}
+              </span>
               <span className={`sd-item__control-label ${opt.hidden === true ? 'line-through' : ''}`}>
                 <span
                   className="sv-string-viewer inline-block align-middle [&_p]:m-0 [&_p]:inline [&_div]:m-0 [&_div]:inline [&_span.ql-cursor]:hidden"
@@ -648,6 +764,16 @@ function SortableOptionRow({
             <ImageIcon className={iconClassName} />
           )}
         </button>
+        {isMultipleChoice && (
+          <button
+            type="button"
+            onClick={onToggleExclusive}
+            className={actionButtonClass(isExclusive)}
+            title="互斥"
+          >
+            <i className="fas fa-ban text-[11px]" />
+          </button>
+        )}
         <button
           type="button"
           onClick={() => onOptionChange({ allowFill: opt.allowFill !== true })}
@@ -1209,7 +1335,18 @@ function QuestionEditor({
   const togglePreviewSelected = (index: number) => {
     if (question.type === 'MULTIPLE_CHOICE') {
       setPreviewSelectedIndices((prev) =>
-        prev.includes(index) ? prev.filter((x) => x !== index) : [...prev, index].sort((a, b) => a - b)
+        {
+          const nextRaw = prev.includes(index) ? prev.filter((x) => x !== index) : [...prev, index]
+          const normalized = normalizeExclusiveChoiceValue({
+            oldValue: prev,
+            nextValue: nextRaw,
+            choiceOptions: options,
+          })
+          const next = Array.isArray(normalized)
+            ? normalized.filter((item): item is number => typeof item === 'number')
+            : nextRaw
+          return next.sort((a, b) => a - b)
+        }
       )
       return
     }
@@ -1226,6 +1363,19 @@ function QuestionEditor({
       const next = current.includes(index) ? current.filter((x) => x !== index) : [...current, index].sort((a, b) => a - b)
       setConfig('defaultOptionIndices', next.length ? next : undefined)
     }
+  }
+
+  const toggleExclusiveOption = (index: number) => {
+    if (question.type !== 'MULTIPLE_CHOICE') return
+    const selectedTargets = previewSelectedIndices.filter((i) => i >= 0 && i < options.length)
+    const targets = selectedTargets.length > 1 ? selectedTargets : [index]
+    const targetSet = new Set(targets)
+    const allExclusive = targets.every((i) => options[i]?.exclusive === true)
+    const nextValue = !allExclusive
+    const next = options.map((opt, i) => (
+      targetSet.has(i) ? { ...opt, exclusive: nextValue } : opt
+    ))
+    setOptions(next)
   }
 
   const patchOptionAt = (index: number, patch: Partial<OptionItem>) => {
@@ -1428,6 +1578,17 @@ function QuestionEditor({
 
   const typeLabel = TYPES.find((t) => t.value === question.type)?.label ?? question.type
   const activeDialogOption = optionDialog ? options[optionDialog.index] : null
+  const multipleChoiceOptionCount = question.type === 'MULTIPLE_CHOICE' ? getVisibleChoiceOptionCount(config) : 1
+  const multipleChoiceMinFloor = question.required !== false ? 1 : 0
+  const rawMultiMin = typeof config.minChoices === 'number' ? config.minChoices : Number(config.minChoices)
+  const rawMultiMax = typeof config.maxChoices === 'number' ? config.maxChoices : Number(config.maxChoices)
+  const multiMinChoices = question.type === 'MULTIPLE_CHOICE'
+    ? Math.min(multipleChoiceOptionCount, Math.max(multipleChoiceMinFloor, Number.isFinite(rawMultiMin) ? Math.trunc(rawMultiMin) : multipleChoiceMinFloor))
+    : 0
+  const multiMaxChoicesBase = question.type === 'MULTIPLE_CHOICE'
+    ? Math.min(multipleChoiceOptionCount, Math.max(1, Number.isFinite(rawMultiMax) ? Math.trunc(rawMultiMax) : multipleChoiceOptionCount))
+    : 1
+  const multiMaxChoices = question.type === 'MULTIPLE_CHOICE' ? Math.max(multiMinChoices, multiMaxChoicesBase) : 1
 
   const optionDialogNode = (
     <OptionEditDialog
@@ -1670,6 +1831,8 @@ function QuestionEditor({
               onOpenImageEditor={() => openOptionDialog(i, 'image')}
               onTogglePreviewSelected={() => togglePreviewSelected(i)}
               previewSelected={isPreviewSelected(i)}
+              onToggleExclusive={() => toggleExclusiveOption(i)}
+              isExclusive={opt.exclusive === true}
               onToggleDefault={() => toggleDefaultOption(i)}
               isDefault={isDefaultOption(i)}
               previewFillValue={previewFillValues[i] ?? ''}
@@ -1729,14 +1892,6 @@ function QuestionEditor({
         {(question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE') && (
           <>
             <div style={{ marginTop: 15 }}>{optionsEditor}</div>
-            {question.type === 'MULTIPLE_CHOICE' && (
-              <div className="flex gap-4 text-sm">
-                <span className="text-gray-600">最少选</span>
-                <input type="number" min={0} value={getInt(config, 'minChoices', 0)} onChange={(e) => setConfig('minChoices', parseInt(e.target.value, 10) || 0)} className={compactInputClass + ' w-16'} />
-                <span className="text-gray-600">最多选</span>
-                <input type="number" min={1} value={config.maxChoices === undefined || config.maxChoices === null ? '' : Number(config.maxChoices)} onChange={(e) => setConfig('maxChoices', e.target.value === '' ? undefined : parseInt(e.target.value, 10) || 1)} className={compactInputClass + ' w-16'} placeholder="不限" />
-              </div>
-            )}
           </>
         )}
         {(question.type === 'SHORT_TEXT' || question.type === 'LONG_TEXT') && (
@@ -1837,25 +1992,50 @@ function QuestionEditor({
           {question.type === 'MULTIPLE_CHOICE' && (
             <div className="mt-3 flex gap-4">
               <div>
-                <label className={labelClass}>最少选</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={getInt(config, 'minChoices', 0)}
-                  onChange={(e) => setConfig('minChoices', parseInt(e.target.value, 10) || 0)}
+                <label className={labelClass}>至少选</label>
+                <select
+                  value={String(multiMinChoices)}
+                  onChange={(e) => {
+                    const nextMinChoices = Math.min(multipleChoiceOptionCount, Math.max(multipleChoiceMinFloor, Number(e.target.value)))
+                    setConfigPatch({
+                      minChoices: nextMinChoices,
+                      maxChoices: Math.max(nextMinChoices, multiMaxChoices),
+                    })
+                  }}
                   className={inputClass + ' w-24'}
-                />
+                >
+                  {Array.from({ length: multipleChoiceOptionCount - multipleChoiceMinFloor + 1 }, (_, idx) => {
+                    const n = multipleChoiceMinFloor + idx
+                    return (
+                      <option key={`full-min-${n}`} value={String(n)}>
+                        {n}
+                      </option>
+                    )
+                  })}
+                </select>
               </div>
               <div>
-                <label className={labelClass}>最多选（空=不限）</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={config.maxChoices === undefined || config.maxChoices === null ? '' : Number(config.maxChoices)}
-                  onChange={(e) => setConfig('maxChoices', e.target.value === '' ? undefined : parseInt(e.target.value, 10) || 1)}
+                <label className={labelClass}>至多选</label>
+                <select
+                  value={String(multiMaxChoices)}
+                  onChange={(e) => {
+                    const nextMaxChoices = Math.min(multipleChoiceOptionCount, Math.max(1, Number(e.target.value)))
+                    setConfigPatch({
+                      minChoices: Math.min(multiMinChoices, nextMaxChoices),
+                      maxChoices: nextMaxChoices,
+                    })
+                  }}
                   className={inputClass + ' w-24'}
-                  placeholder="不限"
-                />
+                >
+                  {Array.from({ length: multipleChoiceOptionCount }, (_, idx) => {
+                    const n = idx + 1
+                    return (
+                      <option key={`full-max-${n}`} value={String(n)}>
+                        {n}
+                      </option>
+                    )
+                  })}
+                </select>
               </div>
             </div>
           )}

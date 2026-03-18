@@ -64,6 +64,7 @@ export function buildTextValidators(config: Record<string, unknown>): { type: st
 type OptItem = {
   label?: string
   allowFill?: boolean
+  exclusive?: boolean
   hidden?: boolean
   imageData?: string
   imageUrl?: string
@@ -112,7 +113,7 @@ export function questionToElements(q: SurveyQuestionVO): Record<string, unknown>
       [a[i], a[j]] = [a[j], a[i]]
     }
     return a
-  }
+    }
 
   switch (q.type) {
     case 'SINGLE_CHOICE': {
@@ -147,6 +148,13 @@ export function questionToElements(q: SurveyQuestionVO): Record<string, unknown>
       }))
       if (hasOther) choices.push({ value: 'other', text: '其他' })
       if (optionsRandom) choices = shuffle(choices)
+      const choiceCount = choices.length
+      const minFloor = q.required !== false ? 1 : 0
+      const rawMin = typeof config.minChoices === 'number' ? config.minChoices : Number(config.minChoices)
+      const rawMax = typeof config.maxChoices === 'number' ? config.maxChoices : Number(config.maxChoices)
+      const minSelectedChoices = Math.min(choiceCount, Math.max(minFloor, Number.isFinite(rawMin) ? Math.trunc(rawMin) : minFloor))
+      const maxSelectedChoicesBase = Math.min(choiceCount, Math.max(1, Number.isFinite(rawMax) ? Math.trunc(rawMax) : choiceCount))
+      const maxSelectedChoices = Math.max(minSelectedChoices, maxSelectedChoicesBase)
       return [
         {
           ...base,
@@ -156,6 +164,8 @@ export function questionToElements(q: SurveyQuestionVO): Record<string, unknown>
           otherText: '其他',
           showCommentArea: hasOther && otherAllowFill,
           colCount: layout === 'horizontal' ? layoutColumns : 1,
+          ...(minSelectedChoices > 0 ? { minSelectedChoices } : {}),
+          ...(maxSelectedChoices < choiceCount ? { maxSelectedChoices } : {}),
           ...(Array.isArray(defaultOptionIndices)
             ? {
                 defaultValue: defaultOptionIndices.filter((index) => visibleOpts.some(({ index: visibleIndex }) => visibleIndex === index)),
