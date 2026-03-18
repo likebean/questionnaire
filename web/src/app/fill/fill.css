@@ -106,6 +106,94 @@
   background: rgba(25, 179, 148, 0.08);
 }
 
+/* 图文卡片模式（编辑显示态/预览态/填写态共用） */
+.fill-page-card .fill-choice-image-cards {
+  display: grid;
+  gap: 16px;
+  margin-top: 4px;
+}
+.fill-page-card .fill-choice-image-cards.fill-choice-image-cards--horizontal {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.fill-page-card .fill-choice-image-cards.fill-choice-image-cards--vertical {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (max-width: 900px) {
+  .fill-page-card .fill-choice-image-cards.fill-choice-image-cards--horizontal {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.fill-page-card .fill-choice-image-cards .sd-item {
+  margin: 0 !important;
+}
+.fill-page-card .fill-choice-image-cards .sd-selectbase__label {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    "image image"
+    "decorator text";
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 12px;
+  width: 100%;
+  min-height: 340px;
+  padding: 12px 14px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 2px;
+  background: #fff;
+  transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
+}
+.fill-page-card .fill-choice-image-cards .sd-item:hover .sd-selectbase__label {
+  border-color: #c2c8d0;
+  background-color: #fcfcfc;
+}
+.fill-page-card .fill-choice-image-cards .sd-item--checked .sd-selectbase__label {
+  border-color: var(--sjs-primary-backcolor, #19b394);
+  box-shadow: inset 0 0 0 1px var(--sjs-primary-backcolor, #19b394);
+  background: rgba(25, 179, 148, 0.04);
+}
+.fill-page-card .fill-choice-image-cards .sd-item__decorator {
+  grid-area: decorator;
+  margin: 0;
+}
+.fill-page-card .fill-choice-image-cards .sd-item__control-label {
+  grid-area: text;
+  min-width: 0;
+}
+.fill-page-card .fill-choice-image-cards .fill-choice-option-image {
+  grid-area: image;
+  justify-self: center;
+  align-self: center;
+  width: auto;
+  max-width: min(100%, 260px);
+  max-height: 400px;
+  object-fit: contain;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.fill-page-card .fill-choice-image-cards .fill-choice-option-image-zoom {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #d6d8dd;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #8a8f98;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+}
+.fill-page-card .fill-choice-image-cards .fill-choice-option-image-zoom:hover {
+  border-color: #b8bdc7;
+  color: #6f7580;
+}
+
 /* 允许填空：跟随选项显示单行输入，贴近选项区域 */
 .fill-page-card .fill-option-inline-input {
   display: none !important;

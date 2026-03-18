@@ -416,6 +416,7 @@ function SortableOptionRow({
     : 'sd-visuallyhidden sd-item__control sd-radio__control'
   const controlId = `edit-opt-${questionType}-${index}`
   const optionLabelHtml = toInlineRichTextHtml(opt.label, `选项${index + 1}`)
+  const optionImageSrc = (opt.imageData || opt.imageUrl || '').trim()
   const actionButtonClass = (active = false, danger = false) =>
     [
       'option-row-action-btn inline-flex h-9 w-9 items-center justify-center rounded-full border bg-white text-[12px] transition-colors',
@@ -506,7 +507,17 @@ function SortableOptionRow({
           className={actionButtonClass(Boolean(opt.imageData || opt.imageUrl))}
           title="编辑图片"
         >
-          <ImageIcon className={iconClassName} />
+          {optionImageSrc ? (
+            <img
+              src={optionImageSrc}
+              alt=""
+              loading="lazy"
+              className="h-7 w-7 rounded-full object-cover"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+            />
+          ) : (
+            <ImageIcon className={iconClassName} />
+          )}
         </button>
         <button
           type="button"

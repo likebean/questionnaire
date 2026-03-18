@@ -2,12 +2,16 @@ type OptItem = {
   allowFill?: boolean
   description?: string
   descriptionOpenInPopup?: boolean
+  imageData?: string
+  imageUrl?: string
 }
 
 const DESC_LINK_CLASS = 'fill-choice-description-link'
 const INLINE_WRAP_CLASS = 'fill-choice-inline-input-wrap'
 const INLINE_INPUT_CLASS = 'fill-choice-inline-input'
 const INLINE_HOST_CLASS = 'fill-choice-inline-host'
+const OPTION_IMAGE_CLASS = 'fill-choice-option-image'
+const OPTION_IMAGE_ZOOM_CLASS = 'fill-choice-option-image-zoom'
 const ROOT_BOUND_KEY = '__fillChoiceEnhanceBound'
 
 function toChoiceIndex(rawValue: string | null): number {
@@ -19,7 +23,9 @@ function toChoiceIndex(rawValue: string | null): number {
 function upsertDescriptionLink(itemEl: Element, opt: OptItem | undefined): void {
   const label = itemEl.querySelector('label')
   if (!label) return
-  const existing = label.querySelector(`.${DESC_LINK_CLASS}`) as HTMLAnchorElement | null
+  const controlLabel = label.querySelector('.sd-item__control-label')
+  const host = controlLabel ?? label
+  const existing = host.querySelector(`.${DESC_LINK_CLASS}`) as HTMLAnchorElement | null
   const desc = opt?.description?.trim()
   if (!desc) {
     existing?.remove()
@@ -40,7 +46,49 @@ function upsertDescriptionLink(itemEl: Element, opt: OptItem | undefined): void 
     link.target = '_blank'
     link.onclick = null
   }
-  if (!existing) label.appendChild(link)
+  if (!existing) host.appendChild(link)
+}
+
+function upsertOptionImage(itemEl: Element, opt: OptItem | undefined, useCardMode: boolean): void {
+  const label = itemEl.querySelector('label')
+  if (!label) return
+  label.querySelectorAll(`img.${OPTION_IMAGE_CLASS}`).forEach((el) => el.remove())
+  label.querySelectorAll(`button.${OPTION_IMAGE_ZOOM_CLASS}`).forEach((el) => el.remove())
+  const src = (opt?.imageData || opt?.imageUrl || '').trim()
+  if (!src || !useCardMode) {
+    return
+  }
+  const img = document.createElement('img')
+  img.className = OPTION_IMAGE_CLASS
+  img.alt = ''
+  img.loading = 'lazy'
+  img.decoding = 'async'
+  img.addEventListener('mousedown', (e) => e.stopPropagation())
+  img.addEventListener('click', (e) => e.stopPropagation())
+  img.addEventListener('error', () => {
+    img.remove()
+  })
+  img.src = src
+  const decorator = label.querySelector('.sd-item__decorator')
+  if (decorator) {
+    label.insertBefore(img, decorator)
+  } else {
+    label.appendChild(img)
+  }
+
+  const zoomBtn = document.createElement('button')
+  zoomBtn.type = 'button'
+  zoomBtn.className = OPTION_IMAGE_ZOOM_CLASS
+  zoomBtn.setAttribute('aria-label', '查看大图')
+  zoomBtn.title = '查看大图'
+  zoomBtn.innerHTML = '<span aria-hidden="true">⌕</span>'
+  zoomBtn.addEventListener('mousedown', (e) => e.stopPropagation())
+  zoomBtn.addEventListener('click', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    window.open(src, '_blank', 'noopener,noreferrer')
+  })
+  label.appendChild(zoomBtn)
 }
 
 function removeInlineInput(itemEl: Element): void {
@@ -102,6 +150,12 @@ export function enhanceChoiceQuestionDom(options: {
 }): void {
   const { questionName, root, config, getValue, setValue } = options
   const opts = ((config.options as OptItem[] | undefined) ?? [])
+  const hasImageOptions = opts.some((o) => ((o?.imageData || o?.imageUrl || '').trim().length > 0))
+  const layout = (config.layout as string) === 'horizontal' ? 'horizontal' : 'vertical'
+  const cardRoot = (root.querySelector('.sd-selectbase') as HTMLElement | null) ?? root
+  cardRoot.classList.toggle('fill-choice-image-cards', hasImageOptions)
+  cardRoot.classList.toggle('fill-choice-image-cards--horizontal', hasImageOptions && layout === 'horizontal')
+  cardRoot.classList.toggle('fill-choice-image-cards--vertical', hasImageOptions && layout !== 'horizontal')
   const allowFillIndices = new Set(
     opts.map((o, i) => (o?.allowFill ? i : -1)).filter((i) => i >= 0)
   )
@@ -116,7 +170,10 @@ export function enhanceChoiceQuestionDom(options: {
       const idx = toChoiceIndex(input?.getAttribute('value') ?? null)
       if (idx < 0) return
       const opt = opts[idx]
+      const item = itemEl as HTMLElement
 
+      item.classList.toggle('fill-choice-image-card-item', hasImageOptions)
+      upsertOptionImage(itemEl, opt, hasImageOptions)
       upsertDescriptionLink(itemEl, opt)
 
       if (allowFillIndices.has(idx) && input?.checked) {

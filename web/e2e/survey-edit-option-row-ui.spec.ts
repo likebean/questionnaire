@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test'
 test.describe('问卷编辑页 选项行 UI', () => {
   test('右侧按钮逐个可操作，且结果符合预期（含截图）', async ({ page }) => {
     const surveyId = 'mock-ui-style'
+    const tinyPngDataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WvN7WwAAAAASUVORK5CYII='
     const optionItem = () => page.locator('.sd-item.sd-selectbase__item')
     const actionButton = (title: string) => page.locator(`.option-row-action-btn[title="${title}"]`)
     const shoot = async (name: string) => {
@@ -142,12 +143,14 @@ test.describe('问卷编辑页 选项行 UI', () => {
     await shoot('02-description-edited')
 
     // 3) 编辑图片
-    await actionButton('编辑图片').nth(0).click()
+    await actionButton('编辑图片').nth(1).click()
     await expect(page.getByRole('heading', { name: '编辑选项图片' })).toBeVisible()
     const imageDialog = page.locator('[role="dialog"]').last()
-    await imageDialog.getByPlaceholder('图片外链 https://...').fill('https://example.com/a.png')
+    await imageDialog.getByPlaceholder('图片外链 https://...').fill(tinyPngDataUrl)
     await imageDialog.getByRole('button', { name: '保存' }).click()
-    await expect(actionButton('编辑图片').nth(0)).toHaveClass(/bg-blue-50/)
+    await expect(actionButton('编辑图片').nth(1)).toHaveClass(/bg-blue-50/)
+    await expect(actionButton('编辑图片').nth(1).locator('img')).toHaveCount(1)
+    await expect(actionButton('编辑图片').nth(1).locator('img').first()).toBeVisible()
     await shoot('03-image-edited')
 
     // 4) 允许填空
@@ -183,6 +186,9 @@ test.describe('问卷编辑页 选项行 UI', () => {
 
     // 9) 完成编辑后，必填红星与标题在同一行
     await page.getByRole('button', { name: '完成编辑' }).click()
+    await expect(page.locator('.edit-question-preview .sd-selectbase.fill-choice-image-cards')).toHaveCount(1)
+    await expect(page.locator('.edit-question-preview .sd-item').first().locator('.fill-choice-option-image')).toHaveCount(1)
+    await expect(page.locator('.edit-question-preview .sd-item').first().locator('.fill-choice-option-image').first()).toBeVisible()
     const titleText = page.locator('.edit-question-preview .sd-question__title .sv-string-viewer').first()
     const titleNumber = page.locator('.edit-question-preview .sd-question__title .sd-element__num').first()
     const requiredStar = page.locator('.edit-question-preview .sd-question__required-text').first()
