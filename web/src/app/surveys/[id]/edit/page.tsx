@@ -45,6 +45,7 @@ import {
   applySurveyRichTextRenderer,
   normalizeOptionLabelHtml,
   richTextToPlainText,
+  sanitizeRichTextHtml,
   toInlineRichTextHtml,
 } from '@/lib/richText'
 import { enhanceChoiceQuestionDom } from '@/lib/choiceQuestionEnhance'
@@ -99,6 +100,8 @@ type OptionItem = {
   label: string
   description?: string
   descriptionOpenInPopup?: boolean
+  descriptionDisplayMode?: 'inline' | 'popup'
+  descriptionLinkOpenMode?: 'popup' | 'newTab'
   allowFill?: boolean
   hidden?: boolean
   /** 图片外链 URL */
@@ -106,6 +109,54 @@ type OptionItem = {
   /** 图片 data URL（base64），上传后存于此；展示时优先于 imageUrl */
   imageData?: string
 }
+
+function looksLikeHttpUrl(value: string): boolean {
+  return /^https?:\/\/\S+$/i.test(value.trim())
+}
+
+function extractFirstHttpUrl(value: string): string | null {
+  const match = value.match(/https?:\/\/[^\s<>"']+/i)
+  return match ? match[0] : null
+}
+
+function extractDescriptionLinkUrl(html: string): string | null {
+  const match = html.match(/<a\b[^>]*\bhref\s*=\s*(['"])(.*?)\1/i)
+  if (!match) return null
+  const href = match[2]?.trim() ?? ''
+  if (looksLikeHttpUrl(href)) return href
+  return extractFirstHttpUrl(href)
+}
+
+function parseOptionDescription(raw: string | undefined): { html: string; linkUrl: string | null } {
+  const html = sanitizeRichTextHtml(raw ?? '')
+  if (!html) return { html: '', linkUrl: null }
+  const plain = richTextToPlainText(html).trim()
+  if (!plain && !/<a\b/i.test(html)) return { html: '', linkUrl: null }
+  const anchorHref = extractDescriptionLinkUrl(html)
+  if (anchorHref) return { html, linkUrl: anchorHref }
+  const firstPlainUrl = extractFirstHttpUrl(plain)
+  if (firstPlainUrl) return { html, linkUrl: firstPlainUrl }
+  return { html, linkUrl: null }
+}
+
+function toInlineDescriptionHtml(html: string): string {
+  return html
+    .replace(/<p[^>]*>/gi, '')
+    .replace(/<\/p>/gi, '<br>')
+    .replace(/(<br>\s*)+$/i, '')
+    .trim()
+}
+
+function getOptionDescriptionDisplayMode(opt: OptionItem | undefined): 'inline' | 'popup' {
+  return opt?.descriptionDisplayMode === 'popup' ? 'popup' : 'inline'
+}
+
+function getOptionDescriptionLinkOpenMode(opt: OptionItem | undefined): 'popup' | 'newTab' {
+  if (opt?.descriptionLinkOpenMode === 'popup') return 'popup'
+  if (opt?.descriptionLinkOpenMode === 'newTab') return 'newTab'
+  return opt?.descriptionOpenInPopup === true ? 'popup' : 'newTab'
+}
+
 function getOptions(config: Record<string, unknown>): OptionItem[] {
   const o = config.options
   if (!Array.isArray(o)) return [{ sortOrder: 0, label: '选项1' }]
@@ -114,6 +165,8 @@ function getOptions(config: Record<string, unknown>): OptionItem[] {
     label: normalizeOptionLabelHtml((x.label as string) ?? '', `选项${i + 1}`),
     description: x.description as string | undefined,
     descriptionOpenInPopup: x.descriptionOpenInPopup === true,
+    descriptionDisplayMode: x.descriptionDisplayMode === 'popup' ? 'popup' : (x.descriptionDisplayMode === 'inline' ? 'inline' : undefined),
+    descriptionLinkOpenMode: x.descriptionLinkOpenMode === 'popup' ? 'popup' : (x.descriptionLinkOpenMode === 'newTab' ? 'newTab' : undefined),
     allowFill: x.allowFill === true,
     hidden: x.hidden === true,
     imageUrl: x.imageUrl as string | undefined,
@@ -446,6 +499,13 @@ function SortableOptionRow({
   const controlId = `edit-opt-${questionType}-${index}`
   const optionLabelHtml = toInlineRichTextHtml(opt.label, `选项${index + 1}`)
   const optionImageSrc = (opt.imageData || opt.imageUrl || '').trim()
+  const parsedDescription = parseOptionDescription(opt.description)
+  const hasDescription = parsedDescription.html.length > 0
+  const descriptionIsLink = Boolean(parsedDescription.linkUrl)
+  const descriptionTextMode = getOptionDescriptionDisplayMode(opt)
+  const descriptionLinkMode = getOptionDescriptionLinkOpenMode(opt)
+  const inlineDescriptionHtml = toInlineDescriptionHtml(parsedDescription.html)
+  const [descPreviewOpen, setDescPreviewOpen] = useState(false)
   const actionButtonClass = (active = false, danger = false) =>
     [
       'option-row-action-btn inline-flex h-9 w-9 items-center justify-center rounded-full border bg-white text-[12px] transition-colors',
@@ -456,6 +516,30 @@ function SortableOptionRow({
           : 'border-gray-200 text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700',
     ].join(' ')
   const iconClassName = 'h-4 w-4'
+
+  useEffect(() => {
+    if (!descPreviewOpen) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDescPreviewOpen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [descPreviewOpen])
+
+  const handleDescriptionClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!hasDescription) return
+    if (descriptionIsLink) {
+      if (descriptionLinkMode === 'popup') {
+        window.open(parsedDescription.linkUrl!, '_blank', 'width=820,height=620,scrollbars=yes,resizable=yes')
+      } else {
+        window.open(parsedDescription.linkUrl!, '_blank', 'noopener,noreferrer')
+      }
+      return
+    }
+    if (descriptionTextMode === 'popup') setDescPreviewOpen(true)
+  }
 
   const mainRow = (
     <div
@@ -493,6 +577,22 @@ function SortableOptionRow({
                   className="sv-string-viewer inline-block align-middle [&_p]:m-0 [&_p]:inline [&_div]:m-0 [&_div]:inline [&_span.ql-cursor]:hidden"
                   dangerouslySetInnerHTML={{ __html: optionLabelHtml }}
                 />
+                {hasDescription && (descriptionIsLink || descriptionTextMode === 'popup') && (
+                  <button
+                    type="button"
+                    className="fill-choice-description-link"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={handleDescriptionClick}
+                  >
+                    说明
+                  </button>
+                )}
+                {hasDescription && !descriptionIsLink && descriptionTextMode === 'inline' && (
+                  <span
+                    className="fill-choice-description-inline"
+                    dangerouslySetInnerHTML={{ __html: inlineDescriptionHtml }}
+                  />
+                )}
               </span>
             </label>
           </div>
@@ -519,7 +619,7 @@ function SortableOptionRow({
         <button
           type="button"
           onClick={onOpenDescriptionEditor}
-          className={actionButtonClass(Boolean(opt.description?.trim()))}
+          className={actionButtonClass(hasDescription)}
           title="编辑说明"
         >
           <AlignLeft className={iconClassName} />
@@ -582,6 +682,30 @@ function SortableOptionRow({
             placeholder="请填写"
             className="sd-input h-9 w-full"
           />
+        </div>
+      )}
+      {hasDescription && !descriptionIsLink && descriptionTextMode === 'popup' && descPreviewOpen && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setDescPreviewOpen(false)
+          }}
+        >
+          <div className="relative w-full max-w-2xl min-h-[300px] max-h-[82vh] overflow-auto rounded-xl border border-gray-200 bg-white shadow-lg p-5">
+            <button
+              type="button"
+              onClick={() => setDescPreviewOpen(false)}
+              className="absolute right-4 top-3 h-7 w-7 rounded-full border border-gray-300 text-gray-500 hover:text-gray-700 hover:border-gray-400"
+              aria-label="关闭说明"
+            >
+              ×
+            </button>
+            <div className="text-sm font-medium text-gray-900 mb-3">说明</div>
+            <div
+              className="text-sm text-gray-700 leading-6 [&_p]:mt-0 [&_p]:mb-2 [&_div]:mt-0 [&_div]:mb-2 [&_li]:mb-1"
+              dangerouslySetInnerHTML={{ __html: parsedDescription.html }}
+            />
+          </div>
         </div>
       )}
     </div>
@@ -1001,7 +1125,8 @@ function QuestionEditor({
   const [optionDialog, setOptionDialog] = useState<{ index: number; mode: 'label' | 'description' | 'image' } | null>(null)
   const [labelDraft, setLabelDraft] = useState('')
   const [descriptionDraft, setDescriptionDraft] = useState('')
-  const [descriptionPopupDraft, setDescriptionPopupDraft] = useState(false)
+  const [descriptionDisplayModeDraft, setDescriptionDisplayModeDraft] = useState<'inline' | 'popup'>('inline')
+  const [descriptionLinkOpenModeDraft, setDescriptionLinkOpenModeDraft] = useState<'popup' | 'newTab'>('newTab')
   const [imageUrlDraft, setImageUrlDraft] = useState('')
   const [imageDataDraft, setImageDataDraft] = useState<string | undefined>(undefined)
   const [previewSelectedIndices, setPreviewSelectedIndices] = useState<number[]>(() => {
@@ -1220,7 +1345,8 @@ function QuestionEditor({
     setOptionDialog({ index, mode })
     setLabelDraft(opt.label ?? '')
     setDescriptionDraft(opt.description ?? '')
-    setDescriptionPopupDraft(opt.descriptionOpenInPopup === true)
+    setDescriptionDisplayModeDraft(getOptionDescriptionDisplayMode(opt))
+    setDescriptionLinkOpenModeDraft(getOptionDescriptionLinkOpenMode(opt))
     setImageUrlDraft(opt.imageUrl ?? '')
     setImageDataDraft(opt.imageData)
   }
@@ -1229,7 +1355,8 @@ function QuestionEditor({
     setOptionDialog(null)
     setLabelDraft('')
     setDescriptionDraft('')
-    setDescriptionPopupDraft(false)
+    setDescriptionDisplayModeDraft('inline')
+    setDescriptionLinkOpenModeDraft('newTab')
     setImageUrlDraft('')
     setImageDataDraft(undefined)
   }
@@ -1241,10 +1368,30 @@ function QuestionEditor({
         label: normalizeOptionLabelHtml(labelDraft, `选项${optionDialog.index + 1}`),
       })
     } else if (optionDialog.mode === 'description') {
-      patchOptionAt(optionDialog.index, {
-        description: descriptionDraft.trim() || undefined,
-        descriptionOpenInPopup: descriptionDraft.trim() ? descriptionPopupDraft : undefined,
-      })
+      const sanitizedDescription = sanitizeRichTextHtml(descriptionDraft)
+      const parsedDescription = parseOptionDescription(sanitizedDescription)
+      if (!parsedDescription.html) {
+        patchOptionAt(optionDialog.index, {
+          description: undefined,
+          descriptionOpenInPopup: undefined,
+          descriptionDisplayMode: undefined,
+          descriptionLinkOpenMode: undefined,
+        })
+      } else if (parsedDescription.linkUrl) {
+        patchOptionAt(optionDialog.index, {
+          description: parsedDescription.html,
+          descriptionOpenInPopup: descriptionLinkOpenModeDraft === 'popup',
+          descriptionDisplayMode: undefined,
+          descriptionLinkOpenMode: descriptionLinkOpenModeDraft,
+        })
+      } else {
+        patchOptionAt(optionDialog.index, {
+          description: parsedDescription.html,
+          descriptionOpenInPopup: undefined,
+          descriptionDisplayMode: descriptionDisplayModeDraft,
+          descriptionLinkOpenMode: undefined,
+        })
+      }
     } else if (optionDialog.mode === 'image') {
       patchOptionAt(optionDialog.index, {
         imageUrl: imageUrlDraft.trim() || undefined,
@@ -1308,25 +1455,67 @@ function QuestionEditor({
       )}
       {optionDialog?.mode === 'description' && (
         <div className="space-y-4">
+          <div className="text-sm text-gray-500">支持富文本。若内容是链接，可设置新页面或弹窗打开；若是普通说明，可设置内联显示或弹窗显示。</div>
           <div>
-            <label className={labelClass}>说明文字或链接</label>
-            <input
-              type="text"
+            <label className={labelClass}>说明内容</label>
+            <RichTitleEditor
               value={descriptionDraft}
-              onChange={(e) => setDescriptionDraft(e.target.value)}
-              className={inputClass}
-              placeholder="说明文字或链接 https://..."
+              onChange={setDescriptionDraft}
+              placeholder="输入说明内容或链接 https://..."
+              autoFocus
             />
           </div>
-          <label className="flex items-center gap-2 text-sm text-gray-600">
-            <input
-              type="checkbox"
-              checked={descriptionPopupDraft}
-              onChange={(e) => setDescriptionPopupDraft(e.target.checked)}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            链接点击时弹窗打开
-          </label>
+          <div>
+            <label className={labelClass}>普通说明展示方式</label>
+            <div className="flex items-center gap-5 text-sm text-gray-600 mt-1">
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="description-display-mode"
+                  checked={descriptionDisplayModeDraft === 'inline'}
+                  onChange={() => setDescriptionDisplayModeDraft('inline')}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                选项下方直接显示
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="description-display-mode"
+                  checked={descriptionDisplayModeDraft === 'popup'}
+                  onChange={() => setDescriptionDisplayModeDraft('popup')}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                点击说明弹窗显示
+              </label>
+            </div>
+          </div>
+          <div>
+            <label className={labelClass}>链接打开方式</label>
+            <div className="flex items-center gap-5 text-sm text-gray-600 mt-1">
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="description-link-open-mode"
+                  checked={descriptionLinkOpenModeDraft === 'newTab'}
+                  onChange={() => setDescriptionLinkOpenModeDraft('newTab')}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                新页面打开
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="description-link-open-mode"
+                  checked={descriptionLinkOpenModeDraft === 'popup'}
+                  onChange={() => setDescriptionLinkOpenModeDraft('popup')}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                弹窗打开
+              </label>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500">保存时会自动识别：若内容为链接则应用“链接打开方式”；否则应用“普通说明展示方式”。</p>
         </div>
       )}
       {optionDialog?.mode === 'image' && (

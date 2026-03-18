@@ -136,8 +136,19 @@ test.describe('问卷编辑页 选项行 UI', () => {
     await actionButton('编辑说明').nth(0).click()
     await expect(page.getByRole('heading', { name: '编辑选项说明' })).toBeVisible()
     const descDialog = page.locator('[role="dialog"]').last()
-    await descDialog.getByPlaceholder('说明文字或链接 https://...').fill('https://example.com/help')
-    await descDialog.getByRole('checkbox', { name: '链接点击时弹窗打开' }).check()
+    const descQuillToolbar = descDialog.locator('.rich-title-quill .ql-toolbar').first()
+    await expect(descQuillToolbar).toBeVisible()
+    const descEditor = descDialog.locator('.ql-editor[contenteditable="true"]')
+    await expect(descEditor).toBeVisible()
+    await descEditor.click()
+    await page.keyboard.press('Control+A')
+    await page.keyboard.type('https://example.com/help')
+    const linkPopupRadio = descDialog.getByRole('radio', { name: '弹窗打开' })
+    if (await linkPopupRadio.count()) {
+      await linkPopupRadio.check()
+    } else {
+      await descDialog.getByRole('radio', { name: '点击说明弹窗显示' }).check()
+    }
     await descDialog.getByRole('button', { name: '保存' }).click()
     await expect(actionButton('编辑说明').nth(0)).toHaveClass(/bg-blue-50/)
     await shoot('02-description-edited')

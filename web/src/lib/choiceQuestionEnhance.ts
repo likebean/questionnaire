@@ -1,12 +1,17 @@
+import { richTextToPlainText, sanitizeRichTextHtml } from '@/lib/richText'
+
 type OptItem = {
   allowFill?: boolean
   description?: string
   descriptionOpenInPopup?: boolean
+  descriptionDisplayMode?: 'inline' | 'popup'
+  descriptionLinkOpenMode?: 'popup' | 'newTab'
   imageData?: string
   imageUrl?: string
 }
 
 const DESC_LINK_CLASS = 'fill-choice-description-link'
+const DESC_INLINE_CLASS = 'fill-choice-description-inline'
 const INLINE_WRAP_CLASS = 'fill-choice-inline-input-wrap'
 const INLINE_INPUT_CLASS = 'fill-choice-inline-input'
 const INLINE_HOST_CLASS = 'fill-choice-inline-host'
@@ -18,6 +23,12 @@ const IMAGE_PREVIEW_OVERLAY_CLASS = 'fill-choice-image-preview-overlay'
 const IMAGE_PREVIEW_OVERLAY_OPEN_CLASS = 'is-open'
 const IMAGE_PREVIEW_IMAGE_CLASS = 'fill-choice-image-preview-image'
 const IMAGE_PREVIEW_CLOSE_CLASS = 'fill-choice-image-preview-close'
+const DESC_PREVIEW_OVERLAY_CLASS = 'fill-choice-description-preview-overlay'
+const DESC_PREVIEW_OVERLAY_OPEN_CLASS = 'is-open'
+const DESC_PREVIEW_DIALOG_CLASS = 'fill-choice-description-preview-dialog'
+const DESC_PREVIEW_TITLE_CLASS = 'fill-choice-description-preview-title'
+const DESC_PREVIEW_CONTENT_CLASS = 'fill-choice-description-preview-content'
+const DESC_PREVIEW_CLOSE_CLASS = 'fill-choice-description-preview-close'
 const ROOT_BOUND_KEY = '__fillChoiceEnhanceBound'
 const MIN_CHOICE_COLUMNS = 2
 const MAX_CHOICE_COLUMNS = 8
@@ -28,33 +39,176 @@ function toChoiceIndex(rawValue: string | null): number {
   return Number.isNaN(idx) ? -1 : idx
 }
 
-function upsertDescriptionLink(itemEl: Element, opt: OptItem | undefined): void {
+function looksLikeHttpUrl(value: string): boolean {
+  return /^https?:\/\/\S+$/i.test(value.trim())
+}
+
+function extractFirstHttpUrl(value: string): string | null {
+  const match = value.match(/https?:\/\/[^\s<>"']+/i)
+  return match ? match[0] : null
+}
+
+function extractAnchorHref(html: string): string | null {
+  const match = html.match(/<a\b[^>]*\bhref\s*=\s*(['"])(.*?)\1/i)
+  if (!match) return null
+  const href = match[2]?.trim() ?? ''
+  if (looksLikeHttpUrl(href)) return href
+  return extractFirstHttpUrl(href)
+}
+
+function parseDescription(raw: string | undefined): { html: string; linkUrl: string | null } {
+  const html = sanitizeRichTextHtml(raw ?? '')
+  if (!html) return { html: '', linkUrl: null }
+  const plain = richTextToPlainText(html).trim()
+  if (!plain && !/<a\b/i.test(html)) return { html: '', linkUrl: null }
+  const anchorHref = extractAnchorHref(html)
+  if (anchorHref) return { html, linkUrl: anchorHref }
+  const firstPlainUrl = extractFirstHttpUrl(plain)
+  if (firstPlainUrl) return { html, linkUrl: firstPlainUrl }
+  return { html, linkUrl: null }
+}
+
+function toInlineDescriptionHtml(html: string): string {
+  return html
+    .replace(/<p[^>]*>/gi, '')
+    .replace(/<\/p>/gi, '<br>')
+    .replace(/(<br>\s*)+$/i, '')
+    .trim()
+}
+
+function getDescriptionTextMode(opt: OptItem | undefined): 'inline' | 'popup' {
+  return opt?.descriptionDisplayMode === 'popup' ? 'popup' : 'inline'
+}
+
+function getDescriptionLinkMode(opt: OptItem | undefined): 'popup' | 'newTab' {
+  if (opt?.descriptionLinkOpenMode === 'popup') return 'popup'
+  if (opt?.descriptionLinkOpenMode === 'newTab') return 'newTab'
+  return opt?.descriptionOpenInPopup === true ? 'popup' : 'newTab'
+}
+
+function ensureDescriptionPreviewOverlay(): HTMLDivElement | null {
+  if (typeof document === 'undefined') return null
+  const existing = document.querySelector(`.${DESC_PREVIEW_OVERLAY_CLASS}`) as HTMLDivElement | null
+  if (existing) return existing
+
+  const overlay = document.createElement('div')
+  overlay.className = DESC_PREVIEW_OVERLAY_CLASS
+  overlay.setAttribute('role', 'dialog')
+  overlay.setAttribute('aria-modal', 'true')
+  overlay.setAttribute('aria-label', '说明')
+
+  const dialog = document.createElement('div')
+  dialog.className = DESC_PREVIEW_DIALOG_CLASS
+
+  const title = document.createElement('div')
+  title.className = DESC_PREVIEW_TITLE_CLASS
+  title.textContent = '说明'
+
+  const closeBtn = document.createElement('button')
+  closeBtn.type = 'button'
+  closeBtn.className = DESC_PREVIEW_CLOSE_CLASS
+  closeBtn.setAttribute('aria-label', '关闭说明')
+  closeBtn.textContent = '×'
+
+  const content = document.createElement('div')
+  content.className = DESC_PREVIEW_CONTENT_CLASS
+
+  const close = () => {
+    overlay.classList.remove(DESC_PREVIEW_OVERLAY_OPEN_CLASS)
+    content.innerHTML = ''
+  }
+
+  closeBtn.addEventListener('click', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    close()
+  })
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) close()
+  })
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') close()
+  })
+
+  dialog.appendChild(title)
+  dialog.appendChild(closeBtn)
+  dialog.appendChild(content)
+  overlay.appendChild(dialog)
+  document.body.appendChild(overlay)
+  return overlay
+}
+
+function openDescriptionPreview(contentHtml: string): void {
+  const overlay = ensureDescriptionPreviewOverlay()
+  if (!overlay) return
+  const content = overlay.querySelector(`.${DESC_PREVIEW_CONTENT_CLASS}`) as HTMLDivElement | null
+  if (!content) return
+  content.innerHTML = contentHtml
+  overlay.classList.add(DESC_PREVIEW_OVERLAY_OPEN_CLASS)
+}
+
+function clearDescriptionDecorations(itemEl: Element): void {
+  itemEl.querySelectorAll(`.${DESC_LINK_CLASS}, .${DESC_INLINE_CLASS}`).forEach((el) => el.remove())
+}
+
+function upsertDescription(itemEl: Element, opt: OptItem | undefined): void {
   const label = itemEl.querySelector('label')
   if (!label) return
-  const controlLabel = label.querySelector('.sd-item__control-label')
-  const host = controlLabel ?? label
-  const existing = host.querySelector(`.${DESC_LINK_CLASS}`) as HTMLAnchorElement | null
-  const desc = opt?.description?.trim()
-  if (!desc) {
-    existing?.remove()
+  const controlLabel = label.querySelector('.sd-item__control-label') as HTMLElement | null
+  clearDescriptionDecorations(itemEl)
+  const parsed = parseDescription(opt?.description)
+  if (!parsed.html) {
     return
   }
-  const link = existing ?? document.createElement('a')
-  link.href = desc
-  link.textContent = ' 说明'
-  link.className = `${DESC_LINK_CLASS} text-blue-600 text-sm ml-1`
-  link.rel = 'noopener noreferrer'
-  if (opt?.descriptionOpenInPopup === true) {
-    link.target = '_blank'
-    link.onclick = (e) => {
-      e.preventDefault()
-      window.open(link.href, '_blank', 'width=600,height=400,scrollbars=yes')
+
+  const host = controlLabel ?? label
+  if (parsed.linkUrl) {
+    const link = document.createElement('a')
+    link.href = parsed.linkUrl
+    link.textContent = '说明'
+    link.className = DESC_LINK_CLASS
+    link.rel = 'noopener noreferrer'
+    link.addEventListener('mousedown', (e) => e.stopPropagation())
+    const linkMode = getDescriptionLinkMode(opt)
+    if (linkMode === 'popup') {
+      link.target = '_blank'
+      link.addEventListener('click', (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        window.open(parsed.linkUrl!, '_blank', 'width=820,height=620,scrollbars=yes,resizable=yes')
+      })
+    } else {
+      link.target = '_blank'
+      link.addEventListener('click', (e) => e.stopPropagation())
     }
-  } else {
-    link.target = '_blank'
-    link.onclick = null
+    host.appendChild(link)
+    return
   }
-  if (!existing) host.appendChild(link)
+
+  if (getDescriptionTextMode(opt) === 'popup') {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = DESC_LINK_CLASS
+    btn.textContent = '说明'
+    btn.addEventListener('mousedown', (e) => e.stopPropagation())
+    btn.addEventListener('click', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      openDescriptionPreview(parsed.html)
+    })
+    host.appendChild(btn)
+    return
+  }
+
+  const inline = document.createElement('span')
+  inline.className = DESC_INLINE_CLASS
+  inline.innerHTML = toInlineDescriptionHtml(parsed.html)
+  inline.addEventListener('mousedown', (e) => e.stopPropagation())
+  if (controlLabel) {
+    controlLabel.appendChild(inline)
+  } else {
+    label.appendChild(inline)
+  }
 }
 
 function upsertOptionImage(itemEl: Element, opt: OptItem | undefined, useCardMode: boolean): void {
@@ -249,7 +403,7 @@ export function enhanceChoiceQuestionDom(options: {
       item.classList.toggle(OPTION_CARD_WITH_IMAGE_CLASS, hasImageOptions && hasOptionImage)
       item.classList.toggle(OPTION_CARD_TEXT_ONLY_CLASS, hasImageOptions && !hasOptionImage)
       upsertOptionImage(itemEl, opt, hasImageOptions)
-      upsertDescriptionLink(itemEl, opt)
+      upsertDescription(itemEl, opt)
 
       if (allowFillIndices.has(idx) && input?.checked) {
         ensureInlineInput(itemEl, commentName, nextCommentValue, setValue)

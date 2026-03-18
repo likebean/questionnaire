@@ -106,6 +106,39 @@
   background: rgba(25, 179, 148, 0.08);
 }
 
+.fill-page-card .fill-choice-description-link {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #2563eb;
+  font-size: 12px;
+  line-height: 1.4;
+  text-decoration: none;
+  cursor: pointer;
+}
+.fill-page-card .fill-choice-description-link:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+.fill-page-card .fill-choice-description-inline {
+  display: block;
+  margin-top: 4px;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.fill-page-card .fill-choice-description-inline p,
+.fill-page-card .fill-choice-description-inline div,
+.fill-page-card .fill-choice-description-inline blockquote,
+.fill-page-card .fill-choice-description-inline ul,
+.fill-page-card .fill-choice-description-inline ol,
+.fill-page-card .fill-choice-description-inline li {
+  margin: 0;
+}
+
 /* 图文卡片模式（编辑显示态/预览态/填写态共用） */
 .fill-page-card .fill-choice-image-cards {
   margin-top: 4px;
@@ -259,6 +292,75 @@
 }
 .fill-choice-image-preview-close:hover {
   background: rgba(0, 0, 0, 0.35);
+}
+.fill-choice-description-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 20px;
+}
+.fill-choice-description-preview-overlay.is-open {
+  display: flex;
+}
+.fill-choice-description-preview-dialog {
+  position: relative;
+  width: min(760px, 92vw);
+  min-height: 300px;
+  max-height: min(640px, 88vh);
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  padding: 16px 18px 18px;
+}
+.fill-choice-description-preview-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 10px;
+}
+.fill-choice-description-preview-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #d1d5db;
+  border-radius: 9999px;
+  background: #fff;
+  color: #6b7280;
+  font-size: 20px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.fill-choice-description-preview-close:hover {
+  color: #374151;
+  border-color: #9ca3af;
+}
+.fill-choice-description-preview-content {
+  color: #374151;
+  font-size: 14px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+.fill-choice-description-preview-content p,
+.fill-choice-description-preview-content div,
+.fill-choice-description-preview-content blockquote,
+.fill-choice-description-preview-content ul,
+.fill-choice-description-preview-content ol,
+.fill-choice-description-preview-content li {
+  margin-top: 0;
+  margin-bottom: 0.5em;
+}
+.fill-choice-description-preview-content > :last-child {
+  margin-bottom: 0;
 }
 
 /* 允许填空：跟随选项显示单行输入，贴近选项区域 */
