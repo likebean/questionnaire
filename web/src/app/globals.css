@@ -102,9 +102,44 @@ textarea:not(.surveyjs-root *):not(.sd-root-modern *),
 .rich-title-quill--display .ql-editor {
   border: none;
   background: transparent;
+  font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+.rich-title-quill--display .ql-editor p,
+.rich-title-quill--display .ql-editor div {
+  display: inline;
+  margin: 0;
+  padding: 0;
 }
 .rich-title-quill--display .ql-editor:hover {
   background: rgba(0, 0, 0, 0.02);
+}
+.rich-title-quill--required.rich-title-quill--display .ql-editor::after {
+  content: '*';
+  margin-left: 2px;
+  color: rgb(229, 10, 62);
+  font-weight: 600;
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+.rich-title-quill--compact.rich-title-quill--display {
+  min-height: auto;
+}
+.rich-title-quill--compact.rich-title-quill--display .ql-container.ql-snow,
+.rich-title-quill--compact.rich-title-quill--display .ql-editor {
+  min-height: 1.5rem;
+}
+.rich-title-quill--compact.rich-title-quill--display .ql-editor {
+  padding: 0;
+  line-height: 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.91);
+}
+
+.question-title-number {
+  font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: rgba(0, 0, 0, 0.45);
 }
 
 /* 编辑问卷紧凑模式：压缩标题编辑器高度，减小与选项区的视觉间距 */

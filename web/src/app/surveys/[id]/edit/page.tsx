@@ -153,6 +153,7 @@ function QuestionFillPreview({ question, index }: { question: SurveyQuestionVO; 
       })
     })
     model.applyTheme(FlatLight)
+    model.showTitle = false
     model.showNavigationButtons = false
     model.showCompletedPage = false
     return model
@@ -225,7 +226,7 @@ function SortableQuestionCard({
       }
     >
       {isEditing ? (
-        <div className="px-4 pt-10 pb-0 bg-gray-50/50 relative">
+        <div className="px-[36px] pt-12 pb-0 bg-gray-50/50 relative">
           <div
             data-no-edit
             className="absolute top-0 left-0 right-0 flex justify-center pt-1.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto z-[1]"
@@ -250,7 +251,7 @@ function SortableQuestionCard({
             hideActions
             compact
           />
-          <div className="mt-4 pt-3 pb-3 border-t border-gray-200/50 bg-gray-100/30 -mx-4 px-4 flex flex-wrap items-center justify-end gap-2 rounded-b">
+          <div className="mt-4 pt-3 pb-3 border-t border-gray-200/50 bg-gray-100/30 -mx-[36px] px-[36px] flex flex-wrap items-center justify-end gap-2 rounded-b">
             <div className="flex flex-wrap items-center gap-2">
               <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer whitespace-nowrap">
                 <input
@@ -378,6 +379,8 @@ function SortableOptionRow({
   previewSelected,
   onToggleDefault,
   isDefault,
+  previewFillValue,
+  onPreviewFillValueChange,
   compact = false,
 }: {
   questionType: string
@@ -393,6 +396,8 @@ function SortableOptionRow({
   previewSelected: boolean
   onToggleDefault: () => void
   isDefault: boolean
+  previewFillValue: string
+  onPreviewFillValueChange: (value: string) => void
   compact?: boolean
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: `opt-${index}` })
@@ -425,7 +430,8 @@ function SortableOptionRow({
   const mainRow = (
     <div
       className={[
-        'flex items-center gap-1.5 py-0 transition-colors hover:bg-gray-100/80 focus-within:bg-gray-100/80',
+        'flex items-start gap-1.5 py-0 transition-colors',
+        compact ? 'pl-3.5 pr-11' : '',
         opt.hidden === true ? 'opacity-70' : '',
       ].join(' ')}
     >
@@ -462,7 +468,21 @@ function SortableOptionRow({
           </div>
         </div>
       </div>
-      <div className="ml-auto flex items-center gap-1 shrink-0">
+    </div>
+  )
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={[
+        compact ? 'py-0' : 'mb-1',
+        'relative hover:bg-gray-100/80 focus-within:bg-gray-100/80',
+        isDragging ? ' opacity-50' : '',
+      ].join(' ')}
+    >
+      {mainRow}
+      <div className="absolute right-0 top-0 flex items-center gap-1 pl-2">
         <button type="button" onClick={onOpenLabelEditor} className={actionButtonClass()} title="编辑选项文字">
           <SquarePen className={iconClassName} />
         </button>
@@ -513,16 +533,17 @@ function SortableOptionRow({
           <EyeOff className={iconClassName} />
         </button>
       </div>
-    </div>
-  )
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={[compact ? 'py-0' : 'mb-1', isDragging ? ' opacity-50' : ''].join(' ')}
-    >
-      {mainRow}
+      {opt.allowFill === true && previewSelected && opt.hidden !== true && (
+        <div className="-mt-1.5 ml-[72px] mr-3 mb-4">
+          <input
+            type="text"
+            value={previewFillValue}
+            onChange={(e) => onPreviewFillValueChange(e.target.value)}
+            placeholder="请填写"
+            className="sd-input h-9 w-full"
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -954,6 +975,7 @@ function QuestionEditor({
     }
     return []
   })
+  const [previewFillValues, setPreviewFillValues] = useState<Record<number, string>>({})
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor)
@@ -962,17 +984,16 @@ function QuestionEditor({
   useEffect(() => {
     if (question.type === 'SINGLE_CHOICE') {
       setPreviewSelectedIndices(typeof config.defaultOptionIndex === 'number' ? [config.defaultOptionIndex] : [])
-      return
-    }
-    if (question.type === 'MULTIPLE_CHOICE') {
+    } else if (question.type === 'MULTIPLE_CHOICE') {
       setPreviewSelectedIndices(
         Array.isArray(config.defaultOptionIndices)
           ? (config.defaultOptionIndices as number[]).filter((x) => Number.isInteger(x))
           : []
       )
-      return
+    } else {
+      setPreviewSelectedIndices([])
     }
-    setPreviewSelectedIndices([])
+    setPreviewFillValues({})
   }, [question.id, question.type])
 
   useEffect(() => {
@@ -1059,6 +1080,14 @@ function QuestionEditor({
       }))
     }
     setConfigPatch(nextPatch)
+    if (patch.allowFill === false) {
+      setPreviewFillValues((prev) => {
+        if (!(index in prev)) return prev
+        const nextValues = { ...prev }
+        delete nextValues[index]
+        return nextValues
+      })
+    }
   }
 
   const addOptionAt = (index: number | null, patch?: Partial<OptionItem>) => {
@@ -1078,6 +1107,14 @@ function QuestionEditor({
       }),
     })
     setPreviewSelectedIndices((prev) => prev.map((x) => (x >= insertIndex ? x + 1 : x)))
+    setPreviewFillValues((prev) => {
+      const nextValues: Record<number, string> = {}
+      Object.entries(prev).forEach(([k, v]) => {
+        const idx = Number(k)
+        nextValues[idx >= insertIndex ? idx + 1 : idx] = v
+      })
+      return nextValues
+    })
   }
 
   const removeOptionAt = (index: number) => {
@@ -1099,6 +1136,15 @@ function QuestionEditor({
       }),
     })
     setPreviewSelectedIndices((prev) => prev.filter((x) => x !== index).map((x) => (x > index ? x - 1 : x)))
+    setPreviewFillValues((prev) => {
+      const nextValues: Record<number, string> = {}
+      Object.entries(prev).forEach(([k, v]) => {
+        const idx = Number(k)
+        if (idx === index) return
+        nextValues[idx > index ? idx - 1 : idx] = v
+      })
+      return nextValues
+    })
   }
 
   const reorderOptions = (oldIndex: number, newIndex: number) => {
@@ -1118,6 +1164,14 @@ function QuestionEditor({
       }),
     })
     setPreviewSelectedIndices((prev) => prev.map(moveIndex).sort((a, b) => a - b))
+    setPreviewFillValues((prev) => {
+      const nextValues: Record<number, string> = {}
+      Object.entries(prev).forEach(([k, v]) => {
+        const idx = Number(k)
+        nextValues[moveIndex(idx)] = v
+      })
+      return nextValues
+    })
   }
 
   const openOptionDialog = (index: number, mode: 'label' | 'description' | 'image') => {
@@ -1389,6 +1443,10 @@ function QuestionEditor({
               previewSelected={isPreviewSelected(i)}
               onToggleDefault={() => toggleDefaultOption(i)}
               isDefault={isDefaultOption(i)}
+              previewFillValue={previewFillValues[i] ?? ''}
+              onPreviewFillValueChange={(value) =>
+                setPreviewFillValues((prev) => ({ ...prev, [i]: value }))
+              }
               compact={compact}
             />
           ))}
@@ -1423,22 +1481,25 @@ function QuestionEditor({
   if (compact) {
     return (
       <div className="space-y-0.5">
-        <div className="flex flex-wrap items-start gap-1.5">
+        <div className="flex flex-wrap items-start gap-0 pr-11">
           {questionNo != null && (
-            <span className="question-title-number mt-8 text-sm font-semibold leading-6 text-gray-700 select-none">{questionNo}.</span>
+            <span className="question-title-number mt-8 inline-flex w-10 shrink-0 justify-end pr-2 text-right text-base font-semibold leading-6 select-none">{questionNo}.</span>
           )}
-          <div className="flex-1 min-w-[200px]">
+          <div className="flex-1 min-w-[200px] -ml-px">
             <RichTitleEditor
               value={question.title ?? ''}
               onChange={(html) => onUpdate({ title: html })}
               placeholder="问题名称"
-              className="rich-title-quill--compact"
+              className={[
+                'rich-title-quill--compact',
+                question.required !== false ? 'rich-title-quill--required' : '',
+              ].join(' ')}
             />
           </div>
         </div>
         {(question.type === 'SINGLE_CHOICE' || question.type === 'MULTIPLE_CHOICE') && (
           <>
-            {optionsEditor}
+            <div style={{ marginTop: 15 }}>{optionsEditor}</div>
             {question.type === 'MULTIPLE_CHOICE' && (
               <div className="flex gap-4 text-sm">
                 <span className="text-gray-600">最少选</span>

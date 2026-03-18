@@ -10,6 +10,7 @@
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch --passWithNoTests",
     "test:e2e": "playwright test",
+    "test:e2e:parity": "playwright test survey-edit-title-option-parity.spec.ts",
     "fetch-wjx-help-links": "node scripts/fetch-wjx-help-links.mjs"
   },
   "dependencies": {

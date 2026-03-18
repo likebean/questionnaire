@@ -11,3 +11,4 @@ api/target
 /web/test-results/
 /api/.mvn/
 /docs/wjx-help/
+/web/tmp-captures/
