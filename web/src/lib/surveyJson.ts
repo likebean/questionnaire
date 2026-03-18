@@ -71,6 +71,18 @@ type OptItem = {
   descriptionOpenInPopup?: boolean
 }
 
+const MIN_CHOICE_COLUMNS = 2
+const MAX_CHOICE_COLUMNS = 8
+
+function getChoiceLayoutConfig(config: Record<string, unknown>): { layout: 'vertical' | 'horizontal'; layoutColumns: number } {
+  const layout = (config.layout as string) === 'horizontal' ? 'horizontal' : 'vertical'
+  const rawColumns = typeof config.layoutColumns === 'number' ? config.layoutColumns : Number(config.layoutColumns)
+  const layoutColumns = Number.isFinite(rawColumns)
+    ? Math.min(MAX_CHOICE_COLUMNS, Math.max(MIN_CHOICE_COLUMNS, Math.trunc(rawColumns)))
+    : MIN_CHOICE_COLUMNS
+  return { layout, layoutColumns }
+}
+
 export function questionToElements(q: SurveyQuestionVO): Record<string, unknown>[] {
   const config = parseConfig(q.config)
   const name = String(q.id!)
@@ -87,7 +99,7 @@ export function questionToElements(q: SurveyQuestionVO): Record<string, unknown>
   const hasOther = config.hasOtherOption === true
   const otherAllowFill = config.otherAllowFill === true
 
-  const layout = (config.layout as string) === 'horizontal' ? 'horizontal' : 'vertical'
+  const { layout, layoutColumns } = getChoiceLayoutConfig(config)
   const optionsAsTags = config.optionsAsTags === true
   const optionsRandom = config.optionsRandom === true
   const defaultOptionIndex = config.defaultOptionIndex as number | undefined
@@ -120,7 +132,7 @@ export function questionToElements(q: SurveyQuestionVO): Record<string, unknown>
           showOtherItem: hasOther,
           otherText: '其他',
           showCommentArea: hasOther && otherAllowFill,
-          colCount: layout === 'horizontal' ? choices.length : 1,
+          colCount: layout === 'horizontal' ? layoutColumns : 1,
           ...(defaultOptionIndex != null && visibleOpts.some(({ index }) => index === defaultOptionIndex) ? { defaultValue: defaultOptionIndex } : {}),
           ...(optionsAsTags && { className: 'fill-options-as-tags' }),
         },
@@ -143,7 +155,7 @@ export function questionToElements(q: SurveyQuestionVO): Record<string, unknown>
           showOtherItem: hasOther,
           otherText: '其他',
           showCommentArea: hasOther && otherAllowFill,
-          colCount: layout === 'horizontal' ? choices.length : 1,
+          colCount: layout === 'horizontal' ? layoutColumns : 1,
           ...(Array.isArray(defaultOptionIndices)
             ? {
                 defaultValue: defaultOptionIndices.filter((index) => visibleOpts.some(({ index: visibleIndex }) => visibleIndex === index)),

@@ -12,11 +12,15 @@ const INLINE_INPUT_CLASS = 'fill-choice-inline-input'
 const INLINE_HOST_CLASS = 'fill-choice-inline-host'
 const OPTION_IMAGE_CLASS = 'fill-choice-option-image'
 const OPTION_IMAGE_ZOOM_CLASS = 'fill-choice-option-image-zoom'
+const OPTION_CARD_WITH_IMAGE_CLASS = 'fill-choice-image-card-item--with-image'
+const OPTION_CARD_TEXT_ONLY_CLASS = 'fill-choice-image-card-item--text-only'
 const IMAGE_PREVIEW_OVERLAY_CLASS = 'fill-choice-image-preview-overlay'
 const IMAGE_PREVIEW_OVERLAY_OPEN_CLASS = 'is-open'
 const IMAGE_PREVIEW_IMAGE_CLASS = 'fill-choice-image-preview-image'
 const IMAGE_PREVIEW_CLOSE_CLASS = 'fill-choice-image-preview-close'
 const ROOT_BOUND_KEY = '__fillChoiceEnhanceBound'
+const MIN_CHOICE_COLUMNS = 2
+const MAX_CHOICE_COLUMNS = 8
 
 function toChoiceIndex(rawValue: string | null): number {
   if (rawValue == null || rawValue === 'other') return -1
@@ -211,10 +215,19 @@ export function enhanceChoiceQuestionDom(options: {
   const opts = ((config.options as OptItem[] | undefined) ?? [])
   const hasImageOptions = opts.some((o) => ((o?.imageData || o?.imageUrl || '').trim().length > 0))
   const layout = (config.layout as string) === 'horizontal' ? 'horizontal' : 'vertical'
+  const rawColumns = typeof config.layoutColumns === 'number' ? config.layoutColumns : Number(config.layoutColumns)
+  const layoutColumns = Number.isFinite(rawColumns)
+    ? Math.min(MAX_CHOICE_COLUMNS, Math.max(MIN_CHOICE_COLUMNS, Math.trunc(rawColumns)))
+    : MIN_CHOICE_COLUMNS
   const cardRoot = (root.querySelector('.sd-selectbase') as HTMLElement | null) ?? root
   cardRoot.classList.toggle('fill-choice-image-cards', hasImageOptions)
   cardRoot.classList.toggle('fill-choice-image-cards--horizontal', hasImageOptions && layout === 'horizontal')
   cardRoot.classList.toggle('fill-choice-image-cards--vertical', hasImageOptions && layout !== 'horizontal')
+  if (hasImageOptions && layout === 'horizontal') {
+    cardRoot.style.setProperty('--fill-choice-card-columns', String(layoutColumns))
+  } else {
+    cardRoot.style.removeProperty('--fill-choice-card-columns')
+  }
   const allowFillIndices = new Set(
     opts.map((o, i) => (o?.allowFill ? i : -1)).filter((i) => i >= 0)
   )
@@ -230,8 +243,11 @@ export function enhanceChoiceQuestionDom(options: {
       if (idx < 0) return
       const opt = opts[idx]
       const item = itemEl as HTMLElement
+      const hasOptionImage = ((opt?.imageData || opt?.imageUrl || '').trim().length > 0)
 
       item.classList.toggle('fill-choice-image-card-item', hasImageOptions)
+      item.classList.toggle(OPTION_CARD_WITH_IMAGE_CLASS, hasImageOptions && hasOptionImage)
+      item.classList.toggle(OPTION_CARD_TEXT_ONLY_CLASS, hasImageOptions && !hasOptionImage)
       upsertOptionImage(itemEl, opt, hasImageOptions)
       upsertDescriptionLink(itemEl, opt)
 

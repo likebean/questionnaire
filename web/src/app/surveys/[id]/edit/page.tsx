@@ -127,6 +127,31 @@ function getInt(config: Record<string, unknown>, key: string, def: number): numb
   return def
 }
 
+const MIN_CHOICE_COLUMNS = 2
+const MAX_CHOICE_COLUMNS = 8
+const CHOICE_COLUMN_OPTIONS = [2, 3, 4, 5, 6, 7, 8] as const
+
+function normalizeChoiceColumns(raw: unknown): number {
+  const n = typeof raw === 'number' ? raw : Number(raw)
+  if (!Number.isFinite(n)) return MIN_CHOICE_COLUMNS
+  return Math.min(MAX_CHOICE_COLUMNS, Math.max(MIN_CHOICE_COLUMNS, Math.trunc(n)))
+}
+
+function getChoiceLayoutSelectValue(config: Record<string, unknown>): string {
+  const layout = (config.layout as string) === 'horizontal' ? 'horizontal' : 'vertical'
+  if (layout === 'vertical') return 'vertical'
+  return `horizontal-${normalizeChoiceColumns(config.layoutColumns)}`
+}
+
+function parseChoiceLayoutSelect(value: string): { layout: 'vertical' | 'horizontal'; layoutColumns?: number } {
+  if (value === 'vertical') return { layout: 'vertical', layoutColumns: undefined }
+  const match = /^horizontal-(\d+)$/.exec(value)
+  return {
+    layout: 'horizontal',
+    layoutColumns: normalizeChoiceColumns(match ? Number(match[1]) : MIN_CHOICE_COLUMNS),
+  }
+}
+
 /** 非编辑态：与填写页一致的题目展示（样式同填写，可本地交互但不保存） */
 function QuestionFillPreview({ question, index }: { question: SurveyQuestionVO; index: number }) {
   const surveyModel = useMemo(() => {
@@ -274,13 +299,17 @@ function SortableQuestionCard({
                     <option value="random">选项随机排列</option>
                   </select>
                   <select
-                    value={(config.layout as string) ?? 'vertical'}
-                    onChange={(e) => setChoiceConfig({ layout: e.target.value })}
-                    className="inline-block w-32 shrink-0 rounded border border-gray-300 bg-white px-2 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    value={getChoiceLayoutSelectValue(config)}
+                    onChange={(e) => setChoiceConfig(parseChoiceLayoutSelect(e.target.value))}
+                    className="inline-block w-40 shrink-0 rounded border border-gray-300 bg-white px-2 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     title="选项排列"
                   >
                     <option value="vertical">选项竖排</option>
-                    <option value="horizontal">选项横排</option>
+                    {CHOICE_COLUMN_OPTIONS.map((cols) => (
+                      <option key={`compact-horizontal-${cols}`} value={`horizontal-${cols}`}>
+                        {`选项${cols}列横排`}
+                      </option>
+                    ))}
                   </select>
                 </>
               )}
@@ -1592,12 +1621,16 @@ function QuestionEditor({
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600 whitespace-nowrap">排列：</span>
               <select
-                value={(config.layout as string) ?? 'vertical'}
-                onChange={(e) => setConfig('layout', e.target.value)}
-                className={inputClass + ' w-28 py-1'}
+                value={getChoiceLayoutSelectValue(config)}
+                onChange={(e) => setConfigPatch(parseChoiceLayoutSelect(e.target.value))}
+                className={inputClass + ' w-40 py-1'}
               >
                 <option value="vertical">竖向排列</option>
-                <option value="horizontal">横向排列</option>
+                {CHOICE_COLUMN_OPTIONS.map((cols) => (
+                  <option key={`full-horizontal-${cols}`} value={`horizontal-${cols}`}>
+                    {`选项${cols}列横排`}
+                  </option>
+                ))}
               </select>
             </div>
             <label className="flex items-center gap-2 text-sm text-gray-600">

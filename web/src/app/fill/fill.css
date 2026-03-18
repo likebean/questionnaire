@@ -108,23 +108,36 @@
 
 /* 图文卡片模式（编辑显示态/预览态/填写态共用） */
 .fill-page-card .fill-choice-image-cards {
-  display: grid;
-  gap: 16px;
   margin-top: 4px;
-}
-.fill-page-card .fill-choice-image-cards.fill-choice-image-cards--horizontal {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-.fill-page-card .fill-choice-image-cards.fill-choice-image-cards--vertical {
-  grid-template-columns: minmax(0, 1fr);
-}
-@media (max-width: 900px) {
-  .fill-page-card .fill-choice-image-cards.fill-choice-image-cards--horizontal {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 .fill-page-card .fill-choice-image-cards .sd-item {
   margin: 0 !important;
+}
+.fill-page-card .fill-choice-image-cards > .sd-item + .sd-item {
+  margin-top: 16px !important;
+}
+.fill-page-card .fill-choice-image-cards .sd-selectbase--multi-column {
+  display: grid;
+  grid-template-columns: repeat(var(--fill-choice-card-columns, 2), minmax(0, 1fr));
+  gap: 16px;
+}
+.fill-page-card .fill-choice-image-cards.fill-choice-image-cards--vertical .sd-selectbase--multi-column {
+  grid-template-columns: minmax(0, 1fr);
+}
+.fill-page-card .fill-choice-image-cards .sd-selectbase--multi-column .sd-selectbase__column {
+  width: auto !important;
+  min-width: 0;
+  margin: 0 !important;
+  padding-right: 0 !important;
+  border-right: 0 !important;
+}
+.fill-page-card .fill-choice-image-cards .sd-selectbase--multi-column .sd-selectbase__column > .sd-item + .sd-item {
+  margin-top: 16px !important;
+}
+@media (max-width: 900px) {
+  .fill-page-card .fill-choice-image-cards.fill-choice-image-cards--horizontal .sd-selectbase--multi-column {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .fill-page-card .fill-choice-image-cards .sd-selectbase__label {
   position: relative;
@@ -143,6 +156,21 @@
   border-radius: 2px;
   background: #fff;
   transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
+}
+.fill-page-card .fill-choice-image-cards .sd-item.fill-choice-image-card-item--text-only {
+  align-self: start;
+}
+.fill-page-card .fill-choice-image-cards .sd-item.fill-choice-image-card-item--text-only .sd-selectbase__label {
+  grid-template-columns: auto 1fr;
+  grid-template-areas: "decorator text";
+  min-height: auto;
+  row-gap: 0;
+  padding-top: 11px;
+  padding-bottom: 11px;
+}
+.fill-page-card .fill-choice-image-cards .sd-item.fill-choice-image-card-item--text-only .sd-item__decorator,
+.fill-page-card .fill-choice-image-cards .sd-item.fill-choice-image-card-item--text-only .sd-item__control-label {
+  align-self: center;
 }
 .fill-page-card .fill-choice-image-cards .sd-item:hover .sd-selectbase__label {
   border-color: #c2c8d0;
