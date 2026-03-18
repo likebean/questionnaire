@@ -374,9 +374,14 @@ export function enhanceChoiceQuestionDom(options: {
     ? Math.min(MAX_CHOICE_COLUMNS, Math.max(MIN_CHOICE_COLUMNS, Math.trunc(rawColumns)))
     : MIN_CHOICE_COLUMNS
   const cardRoot = (root.querySelector('.sd-selectbase') as HTMLElement | null) ?? root
+  const directChildren = Array.from(cardRoot.children)
+  const hasMultiColumnContainer = directChildren.some((child) => (child as HTMLElement).classList.contains('sd-selectbase--multi-column'))
+  const hasFlatItemChildren = directChildren.some((child) => (child as HTMLElement).classList.contains('sd-item'))
+  const useFlatHorizontalGrid = hasFlatItemChildren && !hasMultiColumnContainer
   cardRoot.classList.toggle('fill-choice-image-cards', hasImageOptions)
   cardRoot.classList.toggle('fill-choice-image-cards--horizontal', hasImageOptions && layout === 'horizontal')
   cardRoot.classList.toggle('fill-choice-image-cards--vertical', hasImageOptions && layout !== 'horizontal')
+  cardRoot.classList.toggle('fill-choice-image-cards--flat-items', hasImageOptions && layout === 'horizontal' && useFlatHorizontalGrid)
   if (hasImageOptions && layout === 'horizontal') {
     cardRoot.style.setProperty('--fill-choice-card-columns', String(layoutColumns))
   } else {

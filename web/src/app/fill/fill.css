@@ -149,6 +149,17 @@
 .fill-page-card .fill-choice-image-cards > .sd-item + .sd-item {
   margin-top: 16px !important;
 }
+.fill-page-card .fill-choice-image-cards.fill-choice-image-cards--horizontal.fill-choice-image-cards--flat-items {
+  display: grid;
+  grid-template-columns: repeat(var(--fill-choice-card-columns, 2), minmax(0, 1fr));
+  gap: 16px;
+}
+.fill-page-card .fill-choice-image-cards.fill-choice-image-cards--horizontal.fill-choice-image-cards--flat-items > .sd-item + .sd-item {
+  margin-top: 0 !important;
+}
+.fill-page-card .fill-choice-image-cards.fill-choice-image-cards--vertical {
+  display: block;
+}
 .fill-page-card .fill-choice-image-cards .sd-selectbase--multi-column {
   display: grid;
   grid-template-columns: repeat(var(--fill-choice-card-columns, 2), minmax(0, 1fr));
@@ -167,7 +178,10 @@
 .fill-page-card .fill-choice-image-cards .sd-selectbase--multi-column .sd-selectbase__column > .sd-item + .sd-item {
   margin-top: 16px !important;
 }
-@media (max-width: 900px) {
+@media (max-width: 640px) {
+  .fill-page-card .fill-choice-image-cards.fill-choice-image-cards--horizontal.fill-choice-image-cards--flat-items {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .fill-page-card .fill-choice-image-cards.fill-choice-image-cards--horizontal .sd-selectbase--multi-column {
     grid-template-columns: minmax(0, 1fr);
   }
